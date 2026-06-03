@@ -1102,6 +1102,12 @@ namespace AccessTheObelisk
                 pluginDirectory = ".";
             }
 
+            string localDirectory = Path.Combine(pluginDirectory, "Localization");
+            if (Directory.Exists(localDirectory))
+            {
+                return localDirectory;
+            }
+
             return Path.Combine(pluginDirectory, "AccessTheObelisk", "Localization");
         }
     }
