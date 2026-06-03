@@ -1,0 +1,76 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <CodePage>65001</CodePage>
+    <AssemblyName>AccessTheObelisk</AssemblyName>
+    <RootNamespace>AccessTheObelisk</RootNamespace>
+    <Version>0.3.5</Version>
+    <AssemblyVersion>0.3.5.0</AssemblyVersion>
+    <FileVersion>0.3.5.0</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="decompiled\**" />
+    <Compile Remove="templates\**" />
+    <Compile Remove="installer\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.Physics2DModule">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.InputSystem">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Unity.InputSystem.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.TextMeshPro">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

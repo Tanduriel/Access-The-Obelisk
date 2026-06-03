@@ -1,0 +1,38 @@
+name: Build release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version
+        required: true
+        default: 0.3.5
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build installer
+        shell: pwsh
+        run: .\scripts\Build-Installer.ps1 -Configuration Release
+
+      - name: Package installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path .\dist | Out-Null
+          Copy-Item -LiteralPath .\installer\AccessTheObelisk.Installer\bin\Release\net8.0-windows\win-x64\publish\AccessTheObelisk.Installer.exe -Destination .\dist\AccessTheObelisk.Installer.exe -Force
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AccessTheObelisk.Installer
+          path: dist/AccessTheObelisk.Installer.exe

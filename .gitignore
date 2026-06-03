@@ -1,0 +1,10 @@
+bin/
+obj/
+dist/
+decompiled/
+save-backups/
+*.user
+*.suo
+*.log
+*.zip
+*.nupkg

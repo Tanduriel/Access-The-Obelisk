@@ -1,0 +1,50 @@
+V 0.3.5
+
+Added new hotkeys:
+home - go to the first item in a list or menu,
+end - go to the last item in a list or menu,
+ctrl+h - health,
+ctrl+f - view effects
+ctrl+i - view enemy cards that they are going to play.
+These keys work as follows: if a target is currently focused, HP, effects, and cards will be shown for that target. If no target is focused, HP and effects will be shown for the hero whose turn currently is, and played cards will be shown for all enemies.
+Reworked the perk tree. Perks are now sorted by requirement groups. Left and right arrows move through perks in the selected group, and up and down arrows move through groups. Import, export, and everything related to slots in the perk tree now works correctly, including saving, switching, and deleting builds.
+Added mod settings. The menu opens with ctrl+m. There are currently two settings: enable or disable detailed speech on the map, and enable or disable the names of cards played by enemies.
+Fixed card and effect descriptions. They are now much clearer and more informative.
+Fixed a bug where other buttons could be pressed at the same moment after closing pop-up windows. This affected town rewards for previous runs and some other situations.
+Fixed a bug with discarding X-number of cards.
+Other minor fixes.
+
+
+V 0.3.0:
+
+Added the ability to view detailed information about the card a pet is playing.
+When viewing items, effect descriptions are now visible.
+Added the ability to open the perk tree for a hero who is already selected in one of the slots.
+On the hero selection screen before a run, added the ability to read all information about the focused hero, including stats, resistances, starting cards, and so on.
+Implemented control for madness level and run modifiers.
+Added support for sandbox mode, including configuration and enabling or disabling it.
+Added play requirements to card descriptions when they exist, for example Stealth, Stanza, and similar effects.
+When selecting a card to play, each target now shows the final value for damage, healing, and similar values, taking resistances, vulnerabilities, and other effects into account. The game itself provides this information.
+Fixed character leveling during a run. Now, when enough experience is available, the bonus is selected correctly and the hero level increases.
+Reduced the amount of available information when previewing route locations on the map. It has been brought in line with what a regular player sees, without internal details that are not shown to the player.
+Fixed speech for selecting the amount of energy to spend on playing a card. It now contains less unnecessary information.
+Added the ability to manage profiles, including switching and creating profiles.
+Implemented a localization system for the mod in different languages. Localization files are easy to change without rebuilding the mod. They are placed next to the mod file itself: game_folder\BepInEx\plugins\AccessTheObelisk\localisation. Russian localization has been added; some shortcomings are possible.
+
+
+V 0.1.9:
+
+Fixed a bug with selecting cards when discarding and confirming the discard.
+The Paradox Interactive license agreement should now be read and closed correctly.
+Removed duplicate messages when speaking menu items, events, and similar entries after pressing Enter on them.
+For convenience, all lists, menus, and buffers are now finite, and the first or last item is not repeated when spoken after trying to move above or left of the first item, or below or right of the last item. If a list or buffer contains only one item, it will be spoken when trying to move.
+Revealed monster cards are now placed in a separate buffer. Press ctrl+right arrow from enemy information to view them. Ctrl+up and down arrows show detailed information about each card line by line.
+At the altar, the upgrade price for a card has been added, along with a hint if there is not enough dust. The remaining number of altar uses has been added, if any, as well as the old price if there is currently a discount. A button for transferring gold in multiplayer has been added for the future.
+The Magic Forge has been heavily improved to match the game's own features. It now has navigation through card pages, filter application, and the ability to save and load ready-made decks for each hero.
+The church now has the same features as the altar, plus speech for the minimum deck size. Fixed a bug where the mod could bypass game restrictions when removing cards, including the minimum deck size limit.
+The armory has been improved. Added the ability to reroll items, select the pet shop, and so on, if these features are unlocked in town upgrades. Overall, the armory has also been brought in line with the game's features.
+
+
+V0.1:
+
+First test version.
