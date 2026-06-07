@@ -21,7 +21,7 @@ use windows_sys::Win32::UI::Shell::{
     SHBrowseForFolderW, SHGetPathFromIDListW, BIF_NEWDIALOGSTYLE, BIF_RETURNONLYFSDIRS,
     BROWSEINFOW,
 };
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, SetFocus};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{EnableWindow, GetKeyState, SetFocus};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW,
     GetAncestor, GetMessageW, GetWindowLongPtrW,
@@ -61,6 +61,9 @@ const ES_AUTOVSCROLL: u32 = 0x0040;
 const ES_READONLY: u32 = 0x0800;
 const EM_SETSEL: u32 = 0x00B1;
 const EM_SCROLLCARET: u32 = 0x00B7;
+const VK_TAB_KEY: usize = 0x09;
+const VK_SHIFT_KEY: i32 = 0x10;
+const WM_KEYDOWN_MSG: u32 = 0x0100;
 
 #[derive(Clone, Copy)]
 enum Lang {
@@ -775,6 +778,9 @@ struct ModalState {
     accepted: Cell<bool>,
     selection: Cell<Option<usize>>,
     list: Cell<HWND>,
+    changelog_edit: Cell<HWND>,
+    ok_button: Cell<HWND>,
+    cancel_button: Cell<HWND>,
 }
 
 fn select_release_dialog(owner: HWND, lang: Lang, releases: &[ReleaseInfo]) -> Option<ReleaseInfo> {
@@ -783,6 +789,9 @@ fn select_release_dialog(owner: HWND, lang: Lang, releases: &[ReleaseInfo]) -> O
         accepted: Cell::new(false),
         selection: Cell::new(None),
         list: Cell::new(ptr::null_mut()),
+        changelog_edit: Cell::new(ptr::null_mut()),
+        ok_button: Cell::new(ptr::null_mut()),
+        cancel_button: Cell::new(ptr::null_mut()),
     };
     let hwnd = create_modal_window(owner, lang, tr(lang, Text::VersionWindowTitle), 560, 380, &state);
     unsafe {
@@ -803,8 +812,12 @@ fn select_release_dialog(owner: HWND, lang: Lang, releases: &[ReleaseInfo]) -> O
             SendMessageW(state.list.get(), LB_ADDSTRING, 0, wide(&release.display_name()).as_ptr() as LPARAM);
         }
         SendMessageW(state.list.get(), LB_SETCURSEL, 0, 0);
-        create_button(hwnd, tr(lang, Text::Continue), 300, 295, 110, 32, ID_OK);
-        create_button(hwnd, tr(lang, Text::Cancel), 422, 295, 110, 32, ID_CANCEL);
+        state
+            .ok_button
+            .set(create_button(hwnd, tr(lang, Text::Continue), 300, 295, 110, 32, ID_OK));
+        state
+            .cancel_button
+            .set(create_button(hwnd, tr(lang, Text::Cancel), 422, 295, 110, 32, ID_CANCEL));
         ShowWindow(hwnd, SW_SHOW);
         EnableWindow(owner, 0);
         SetFocus(state.list.get());
@@ -826,6 +839,9 @@ fn show_changelog_dialog(owner: HWND, lang: Lang, release: &ReleaseInfo) -> bool
         accepted: Cell::new(false),
         selection: Cell::new(None),
         list: Cell::new(ptr::null_mut()),
+        changelog_edit: Cell::new(ptr::null_mut()),
+        ok_button: Cell::new(ptr::null_mut()),
+        cancel_button: Cell::new(ptr::null_mut()),
     };
     let title = format!("{} {}", tr(lang, Text::ChangelogTitle), release.tag_name);
     let hwnd = create_modal_window(owner, lang, &title, 700, 520, &state);
@@ -836,7 +852,7 @@ fn show_changelog_dialog(owner: HWND, lang: Lang, release: &ReleaseInfo) -> bool
     };
 
     unsafe {
-        let changelog_edit = create_control(
+        state.changelog_edit.set(create_control(
             "EDIT",
             &text,
             WS_CHILD
@@ -854,14 +870,18 @@ fn show_changelog_dialog(owner: HWND, lang: Lang, release: &ReleaseInfo) -> bool
             400,
             hwnd,
             0,
-        );
-        create_button(hwnd, tr(lang, Text::Continue), 440, 426, 110, 32, ID_OK);
-        create_button(hwnd, tr(lang, Text::Cancel), 562, 426, 110, 32, ID_CANCEL);
+        ));
+        state
+            .ok_button
+            .set(create_button(hwnd, tr(lang, Text::Continue), 440, 426, 110, 32, ID_OK));
+        state
+            .cancel_button
+            .set(create_button(hwnd, tr(lang, Text::Cancel), 562, 426, 110, 32, ID_CANCEL));
         ShowWindow(hwnd, SW_SHOW);
         EnableWindow(owner, 0);
-        SendMessageW(changelog_edit, EM_SETSEL, 0, 0);
-        SendMessageW(changelog_edit, EM_SCROLLCARET, 0, 0);
-        SetFocus(changelog_edit);
+        SendMessageW(state.changelog_edit.get(), EM_SETSEL, 0, 0);
+        SendMessageW(state.changelog_edit.get(), EM_SCROLLCARET, 0, 0);
+        SetFocus(state.changelog_edit.get());
         run_modal_loop(owner, &state);
         EnableWindow(owner, 1);
         DestroyWindow(hwnd);
@@ -942,6 +962,21 @@ extern "system" fn modal_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 unsafe fn run_modal_loop(owner: HWND, state: &ModalState) {
     let mut msg: MSG = std::mem::zeroed();
     while !state.done.get() && GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
+        if msg.message == WM_KEYDOWN_MSG
+            && msg.wParam == VK_TAB_KEY
+            && !state.changelog_edit.get().is_null()
+            && msg.hwnd == state.changelog_edit.get()
+        {
+            let target = if GetKeyState(VK_SHIFT_KEY) < 0 {
+                state.cancel_button.get()
+            } else {
+                state.ok_button.get()
+            };
+            if !target.is_null() {
+                SetFocus(target);
+                continue;
+            }
+        }
         if IsDialogMessageW(GetAncestor(msg.hwnd, GA_ROOT), &mut msg) == 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
