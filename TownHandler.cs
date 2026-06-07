@@ -21,6 +21,7 @@ namespace AccessTheObelisk
         private int _index;
         private bool _announced;
         private float _lastRefreshTime;
+        private string _lastWaitingText;
 
         /// <summary>
         /// Updates town hub navigation.
@@ -49,6 +50,7 @@ namespace AccessTheObelisk
             {
                 Refresh(town);
                 AnnounceTownOnce(town);
+                AnnounceWaitingIfChanged(town);
                 _lastRefreshTime = Time.unscaledTime;
             }
 
@@ -61,6 +63,24 @@ namespace AccessTheObelisk
             _items.Clear();
             _index = 0;
             _announced = false;
+            _lastWaitingText = null;
+        }
+
+        private void AnnounceWaitingIfChanged(TownManager town)
+        {
+            string text = town.waitingMsgText != null && town.waitingMsgText.gameObject.activeInHierarchy
+                ? Clean(town.waitingMsgText.text)
+                : "";
+            if (text == _lastWaitingText)
+            {
+                return;
+            }
+
+            _lastWaitingText = text;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                ScreenReader.SayQueued(text);
+            }
         }
 
         private void Refresh(TownManager town)

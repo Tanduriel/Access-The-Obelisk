@@ -88,7 +88,8 @@ namespace AccessTheObelisk
         {
             bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl || !Input.GetKeyDown(KeyCode.F) || TextInputFocusHelper.IsTextInputFocused())
+            bool vanishPile = ctrl && shift;
+            if ((!vanishPile && ctrl) || !Input.GetKeyDown(KeyCode.F) || TextInputFocusHelper.IsTextInputFocused())
             {
                 return false;
             }
@@ -106,7 +107,14 @@ namespace AccessTheObelisk
 
             if (MatchManager.Instance != null)
             {
-                if (shift)
+                if (vanishPile)
+                {
+                    if (TryOpenCombatVanishPile())
+                    {
+                        return true;
+                    }
+                }
+                else if (shift)
                 {
                     if (TryOpenCombatDiscardPile())
                     {
@@ -151,6 +159,11 @@ namespace AccessTheObelisk
         private static bool TryOpenCombatDiscardPile()
         {
             return TryOpenCombatPile("combatdiscard", "deck_discard_opened");
+        }
+
+        private static bool TryOpenCombatVanishPile()
+        {
+            return TryOpenCombatPile("combatvanish", "deck_vanish_opened");
         }
 
         private static bool TryOpenCombatPile(string type, string announcementKey)
@@ -543,9 +556,7 @@ namespace AccessTheObelisk
 
             if (CardScreenManager.Instance != null)
             {
-                CardScreenManager.Instance.ShowCardScreen(_state: true);
-                CardScreenManager.Instance.SetCardData(item.Card.CardData);
-                ScreenReader.Say(Loc.Get("deck_card_detail", Clean(item.Card.CardData.CardName)));
+                CardScreenHandler.Open(item.Card.CardData);
             }
         }
 

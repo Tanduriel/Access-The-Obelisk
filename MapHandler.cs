@@ -532,6 +532,12 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (IsFollowingLeaderSelectionBlocked())
+            {
+                ScreenReader.Say(Loc.Get("map_following_leader_selection_blocked", text));
+                return;
+            }
+
             ScreenReader.Say(Loc.Get("activated_loading", text));
             if (map != null && !map.selectedNode)
             {
@@ -539,6 +545,16 @@ namespace AccessTheObelisk
                 map.HidePopup();
                 map.PlayerSelectedNode(node);
             }
+        }
+
+        private static bool IsFollowingLeaderSelectionBlocked()
+        {
+            return GameManager.Instance != null
+                && GameManager.Instance.IsMultiplayer()
+                && NetworkManager.Instance != null
+                && !NetworkManager.Instance.IsMaster()
+                && AtOManager.Instance != null
+                && AtOManager.Instance.followingTheLeader;
         }
 
         private Node GetFocusedNode()

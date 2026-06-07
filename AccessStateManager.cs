@@ -92,8 +92,14 @@
         /// <summary>Map corruption reward choice is active.</summary>
         Corruption,
 
+        /// <summary>Multiplayer map path conflict resolution is active.</summary>
+        Conflict,
+
         /// <summary>Character deck view is active.</summary>
         CharacterDeck,
+
+        /// <summary>Full card detail overlay is active.</summary>
+        CardScreen,
 
         /// <summary>Full character information window is active.</summary>
         CharacterInfo,
@@ -103,6 +109,12 @@
 
         /// <summary>Paradox legal document screen is active.</summary>
         ParadoxDocument,
+
+        /// <summary>Multiplayer lobby is active.</summary>
+        Lobby,
+
+        /// <summary>Multiplayer resource transfer window is active.</summary>
+        Give,
 
         /// <summary>Cinematic scene is active.</summary>
         Cinematic

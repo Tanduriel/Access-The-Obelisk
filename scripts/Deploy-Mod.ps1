@@ -27,6 +27,20 @@ $dllPath = Join-Path $projectRoot "bin\$Configuration\net472\AccessTheObelisk.dl
 Copy-Item -LiteralPath $dllPath -Destination $modDir -Force
 Write-Host "Deployed AccessTheObelisk.dll to $modDir"
 
+$prismDllPath = Join-Path $projectRoot "third_party\prism\v0.16.5\windows-x64\prism.dll"
+if (Test-Path -LiteralPath $prismDllPath) {
+    Copy-Item -LiteralPath $prismDllPath -Destination $GamePath -Force
+    Write-Host "Deployed prism.dll to $GamePath"
+
+    $legacyPrismPath = Join-Path $modDir "prism.dll"
+    if (Test-Path -LiteralPath $legacyPrismPath) {
+        Remove-Item -LiteralPath $legacyPrismPath -Force
+        Write-Host "Removed duplicate prism.dll from $modDir"
+    }
+} else {
+    Write-Error "Prism DLL not found at $prismDllPath."
+}
+
 $legacyDllPath = Join-Path $pluginsDir "AccessTheObelisk.dll"
 if (Test-Path -LiteralPath $legacyDllPath) {
     Remove-Item -LiteralPath $legacyDllPath -Force

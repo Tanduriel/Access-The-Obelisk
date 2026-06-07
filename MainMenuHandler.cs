@@ -22,6 +22,7 @@ namespace AccessTheObelisk
         private int _manualFocusIndex = -1;
         private bool _manualFocusAnnouncedThisFrame;
         private bool _initializedMenuFocus;
+        private bool _queueNextFocusAnnouncement;
         private float _lastPollTime;
         private float _suppressFocusUntil;
 
@@ -88,7 +89,7 @@ namespace AccessTheObelisk
             }
 
             _initializedMenuFocus = true;
-            ScreenReader.Say(Loc.Get("main_menu_loaded"));
+            SayScreen(Loc.Get("main_menu_loaded"));
             WarpMouseTo(first.position);
         }
 
@@ -111,21 +112,21 @@ namespace AccessTheObelisk
                 _pendingInitialFocusScreen = currentScreen;
                 _manualFocusScreen = currentScreen;
                 _manualFocusIndex = 0;
-                ScreenReader.Say(Loc.Get("game_mode_screen"));
+                SayScreen(Loc.Get("game_mode_screen"));
             }
             else if (currentScreen == "Save")
             {
                 _pendingInitialFocusScreen = currentScreen;
                 _manualFocusScreen = currentScreen;
                 _manualFocusIndex = 0;
-                ScreenReader.Say(Loc.Get("save_slot_screen"));
+                SayScreen(Loc.Get("save_slot_screen"));
             }
             else if (currentScreen == "Profiles")
             {
                 _pendingInitialFocusScreen = currentScreen;
                 _manualFocusScreen = currentScreen;
                 _manualFocusIndex = 0;
-                ScreenReader.Say(Loc.Get("profile_screen"));
+                SayScreen(Loc.Get("profile_screen"));
             }
             else if (currentScreen == "Main")
             {
@@ -455,6 +456,13 @@ namespace AccessTheObelisk
             AnnounceCurrentIfChanged(menu);
         }
 
+        private void SayScreen(string text)
+        {
+            ScreenReader.Say(text);
+            _queueNextFocusAnnouncement = true;
+            _suppressFocusUntil = Time.unscaledTime + 0.08f;
+        }
+
         private void AnnounceCurrentIfChanged(MainMenuManager menu)
         {
             GameObject current = GetCurrentFocusObject(menu);
@@ -484,7 +492,15 @@ namespace AccessTheObelisk
 
             _lastObject = current;
             _lastAnnouncement = announcement;
-            ScreenReader.Say(announcement);
+            if (_queueNextFocusAnnouncement)
+            {
+                _queueNextFocusAnnouncement = false;
+                ScreenReader.SayQueued(announcement);
+            }
+            else
+            {
+                ScreenReader.Say(announcement);
+            }
         }
 
         private void ActivateCurrent()

@@ -85,13 +85,13 @@ namespace AccessTheObelisk
             bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
             {
-                ReadLine(-1);
+                ReadLine(1);
                 return;
             }
 
             if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
             {
-                ReadLine(1);
+                ReadLine(-1);
                 return;
             }
 

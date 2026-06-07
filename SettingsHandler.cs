@@ -262,7 +262,14 @@ namespace AccessTheObelisk
                     label = ReadControlLabel(toggle.transform, Loc.Get("settings_unknown_toggle"));
                 }
 
-                AddToggle(key, label, toggle);
+                if (IsResetActionToggle(settings, toggle))
+                {
+                    AddButton(key, label, toggle);
+                }
+                else
+                {
+                    AddToggle(key, label, toggle);
+                }
             }
 
             Slider[] sliders = tab.GetComponentsInChildren<Slider>(true);
@@ -855,6 +862,11 @@ namespace AccessTheObelisk
             }
 
             return false;
+        }
+
+        private static bool IsResetActionToggle(SettingsManager settings, Toggle toggle)
+        {
+            return settings != null && toggle != null && (toggle == settings.resetTutorialToggle || toggle == settings.resetSavedToggle);
         }
 
         private bool ContainsSlider(Slider slider)

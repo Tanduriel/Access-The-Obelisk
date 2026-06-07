@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
@@ -54,6 +55,7 @@ namespace AccessTheObelisk
         private bool _announced;
         private string _lastHeader;
         private string _lastFocusKey;
+        private string _lastWaitingText;
         private float _lastRefreshTime;
         private float _ignoreInputUntil;
         private bool _waitForSubmitRelease;
@@ -81,6 +83,7 @@ namespace AccessTheObelisk
             {
                 Refresh(challenge, craft);
                 AnnounceScreen(challenge, craft);
+                AnnounceWaitingIfChanged(craft);
                 _lastRefreshTime = Time.unscaledTime;
             }
 
@@ -101,8 +104,28 @@ namespace AccessTheObelisk
             _announced = false;
             _lastHeader = null;
             _lastFocusKey = null;
+            _lastWaitingText = null;
             _ignoreInputUntil = 0f;
             _waitForSubmitRelease = false;
+        }
+
+        private void AnnounceWaitingIfChanged(CardCraftManager craft)
+        {
+            string text = craft != null &&
+                craft.waitingMsgTextChallenge != null &&
+                craft.waitingMsgTextChallenge.gameObject.activeInHierarchy
+                    ? Clean(craft.waitingMsgTextChallenge.text)
+                    : "";
+            if (text == _lastWaitingText)
+            {
+                return;
+            }
+
+            _lastWaitingText = text;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                ScreenReader.SayQueued(text);
+            }
         }
 
         private void Refresh(ChallengeSelectionManager challenge, CardCraftManager craft)
@@ -203,24 +226,27 @@ namespace AccessTheObelisk
             for (int i = 0; i < craft.perkChallengeItems.Length; i++)
             {
                 PerkChallengeItem perk = craft.perkChallengeItems[i];
-                if (perk == null || !perk.gameObject.activeInHierarchy || !Functions.TransformIsVisible(perk.transform))
+                if (perk == null || !perk.gameObject.activeInHierarchy)
                 {
                     continue;
                 }
 
                 PerkData data = ReadPerkData(perk);
+                int perkIndex = ReadPerkIndex(perk);
+                if (data == null || perkIndex < 0)
+                {
+                    continue;
+                }
+
                 ChallengeItem item = new ChallengeItem();
                 item.Perk = perk;
-                item.PerkIndex = ReadPerkIndex(perk);
+                item.PerkIndex = perkIndex;
                 item.Selected = ReadBool(PerkActiveField, perk);
                 item.Available = ReadBool(PerkEnabledField, perk);
-                string name = data != null ? BuildPerkName(data) : Loc.Get("perk_unknown");
-                item.Summary = Loc.Get("challenge_perk_summary", name, item.Selected ? Loc.Get("challenge_selected") : item.Available ? Loc.Get("available") : Loc.Get("unavailable"));
+                string name = BuildPerkName(data);
+                item.Summary = Loc.Get("challenge_perk_summary", BuildPerkSummary(name, data), item.Selected ? Loc.Get("challenge_selected") : item.Available ? Loc.Get("available") : Loc.Get("unavailable"));
                 item.Lines.Add(item.Summary);
-                if (data != null)
-                {
-                    AddPerkDetailLines(item.Lines, data);
-                }
+                AddPerkDetailLines(item.Lines, data);
 
                 _choices.Add(item);
             }
@@ -256,6 +282,7 @@ namespace AccessTheObelisk
                     item.Summary = Loc.Get("challenge_reroll");
                 }
 
+                item.Summary = Loc.Get("challenge_reroll_summary", item.Summary);
                 _actions.Add(item);
             }
 
@@ -295,7 +322,10 @@ namespace AccessTheObelisk
             {
                 _lastHeader = header;
                 ScreenReader.Say(header);
-                AnnounceFocused(true);
+                if (_zone != Zone.Heroes)
+                {
+                    AnnounceFocused(true);
+                }
             }
         }
 
@@ -304,7 +334,7 @@ namespace AccessTheObelisk
             string title = Clean(craft.cardChallengeGlobalTitle != null ? craft.cardChallengeGlobalTitle.text : "");
             string round = Clean(craft.cardChallengeRound != null ? craft.cardChallengeRound.text : "");
             string hero = HeroName(challenge.currentHeroIndex);
-            string bonus = Clean(craft.cardChallengeBonus != null ? craft.cardChallengeBonus.text : "");
+            string bonus = BuildDeckSummary(challenge.currentHeroIndex);
             List<string> parts = new List<string>();
             parts.Add(string.IsNullOrWhiteSpace(title) ? Loc.Get("challenge_screen") : title);
             if (!string.IsNullOrWhiteSpace(hero))
@@ -456,6 +486,9 @@ namespace AccessTheObelisk
                 if (hero >= 0 && hero != challenge.currentHeroIndex)
                 {
                     AtOManager.Instance.SideBarCharacterClicked(hero);
+                    _lastHeader = null;
+                    _lastFocusKey = FocusKey();
+                    return;
                 }
             }
             else if (_zone == Zone.Actions)
@@ -490,6 +523,9 @@ namespace AccessTheObelisk
                 if (hero >= 0 && hero != challenge.currentHeroIndex)
                 {
                     AtOManager.Instance.SideBarCharacterClicked(hero);
+                    _lastHeader = null;
+                    _lastFocusKey = FocusKey();
+                    return;
                 }
             }
             else if (_zone == Zone.Actions)
@@ -518,7 +554,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            ScreenReader.Say(Loc.Get("combat_buffer_position", item.Lines[_lineIndex], _lineIndex + 1, item.Lines.Count));
+            ScreenReader.Say(item.Lines[_lineIndex]);
         }
 
         private void JumpLine(bool end)
@@ -535,7 +571,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            ScreenReader.Say(Loc.Get("combat_buffer_position", item.Lines[_lineIndex], _lineIndex + 1, item.Lines.Count));
+            ScreenReader.Say(item.Lines[_lineIndex]);
         }
 
         private void Activate(ChallengeSelectionManager challenge)
@@ -616,6 +652,10 @@ namespace AccessTheObelisk
             if (item.Reroll)
             {
                 challenge.RerollFromButton();
+                ScreenReader.Say(Loc.Get("challenge_reroll_done"));
+                _lastHeader = null;
+                _lastFocusKey = null;
+                return;
             }
             else if (item.Ready)
             {
@@ -656,7 +696,7 @@ namespace AccessTheObelisk
             if (_zone == Zone.Choices)
             {
                 ChallengeItem item = CurrentChoice();
-                return "choice:" + (item != null ? item.Summary : _choiceIndex.ToString());
+                return item != null ? "choice:" + _choiceIndex + ":" + item.PackIndex + ":" + item.PerkIndex : "choice:" + _choiceIndex;
             }
 
             if (_zone == Zone.Heroes)
@@ -672,13 +712,13 @@ namespace AccessTheObelisk
             if (_zone == Zone.Choices)
             {
                 ChallengeItem item = CurrentChoice();
-                return item != null ? Loc.Get("challenge_choice_position", _choiceIndex + 1, _choices.Count, item.Summary) : Loc.Get("challenge_no_choice");
+                return item != null ? ChoiceFocusText(item) : Loc.Get("challenge_no_choice");
             }
 
             if (_zone == Zone.Heroes)
             {
                 int hero = CurrentHeroIndex();
-                return hero >= 0 ? Loc.Get("challenge_hero_position", _heroIndex + 1, _heroes.Count, HeroName(hero)) : Loc.Get("unknown_hero");
+                return hero >= 0 ? HeroName(hero) : Loc.Get("unknown_hero");
             }
 
             ActionItem action = CurrentAction();
@@ -688,7 +728,7 @@ namespace AccessTheObelisk
             }
 
             string summary = action.Available ? action.Summary : Loc.Get("menu_item_unavailable", action.Summary);
-            return Loc.Get("challenge_action_position", _actionIndex + 1, _actions.Count, summary);
+            return summary;
         }
 
         private ChallengeItem CurrentChoice()
@@ -787,7 +827,8 @@ namespace AccessTheObelisk
                 return;
             }
 
-            lines.Add(Loc.Get("challenge_card_line", Clean(GameText.CardName(data)), data.EnergyCost, GameText.CardTypeName(data.CardType)));
+            lines.Add(CardSpeech.BuildCardFocusSummary(data, data.EnergyCost));
+            lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
         }
 
         private static void AddCardDetails(List<string> lines, CardData data)
@@ -797,31 +838,12 @@ namespace AccessTheObelisk
                 return;
             }
 
-            lines.Add(Clean(data.CardName));
-            lines.Add(Loc.Get("combat_card_cost", data.EnergyCost));
-            lines.Add(Loc.Get("combat_card_type", GameText.CardTypeName(data.CardType)));
-            lines.Add(Loc.Get("combat_card_target", Clean(data.Target)));
-            int damage = data.DamagePreCalculated != 0 ? data.DamagePreCalculated : data.Damage;
-            if (damage != 0)
-            {
-                lines.Add(Loc.Get("combat_card_damage", damage));
-            }
-
-            if (data.Heal != 0)
-            {
-                lines.Add(Loc.Get("combat_card_heal", data.Heal));
-            }
-
-            string description = Clean(!string.IsNullOrWhiteSpace(data.DescriptionNormalized) ? data.DescriptionNormalized : data.Description);
-            if (!string.IsNullOrWhiteSpace(description))
-            {
-                lines.Add(Loc.Get("combat_card_description", description));
-            }
+            lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
         }
 
         private static void AddPerkDetailLines(List<string> lines, PerkData data)
         {
-            string description = Clean(Perk.PerkDescription(data, doPopup: true, data.Level, 0, enabled: true, active: false));
+            string description = Clean(LocalizedPerkDescription(data));
             if (!string.IsNullOrWhiteSpace(description))
             {
                 lines.Add(description);
@@ -875,6 +897,258 @@ namespace AccessTheObelisk
             return string.IsNullOrWhiteSpace(joined) ? data.Id : joined;
         }
 
+        private static string BuildPerkSummary(string name, PerkData data)
+        {
+            string description = data != null ? Clean(LocalizedPerkDescription(data)) : "";
+            string specific = data != null ? BuildPerkSpecificLine(data) : "";
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                return string.IsNullOrWhiteSpace(specific) ? name : specific;
+            }
+
+            if (!string.IsNullOrWhiteSpace(specific) && !description.Contains(specific))
+            {
+                return description + " " + specific;
+            }
+
+            if (string.IsNullOrWhiteSpace(name) || description.Contains(name))
+            {
+                return description;
+            }
+
+            return name + ". " + description;
+        }
+
+        private static string ChoiceFocusText(ChallengeItem item)
+        {
+            if (item == null)
+            {
+                return Loc.Get("challenge_no_choice");
+            }
+
+            if (!string.IsNullOrWhiteSpace(item.Summary))
+            {
+                return item.Summary;
+            }
+
+            for (int i = 0; i < item.Lines.Count; i++)
+            {
+                if (!string.IsNullOrWhiteSpace(item.Lines[i]))
+                {
+                    return item.Lines[i];
+                }
+            }
+
+            return item.Perk != null ? Loc.Get("perk_unknown") : Loc.Get("challenge_no_choice");
+        }
+
+        private static string BuildPerkSpecificLine(PerkData data)
+        {
+            if (data == null)
+            {
+                return string.Empty;
+            }
+
+            if (data.DamageFlatBonus != Enums.DamageType.None && data.DamageFlatBonusValue != 0)
+            {
+                return Loc.Get("item_damage_bonus", GameText.DamageTypeName(data.DamageFlatBonus), data.DamageFlatBonusValue);
+            }
+
+            if (data.ResistModified != Enums.DamageType.None && data.ResistModifiedValue != 0)
+            {
+                return Loc.Get("item_resist", GameText.DamageTypeName(data.ResistModified), data.ResistModifiedValue);
+            }
+
+            if (data.AuracurseBonus != null && data.AuracurseBonusValue != 0)
+            {
+                return Loc.Get("item_aura_bonus", Clean(GameText.AuraCurseName(data.AuracurseBonus)), data.AuracurseBonusValue);
+            }
+
+            return string.Empty;
+        }
+
+        private static string LocalizedPerkDescription(PerkData data)
+        {
+            if (data == null)
+            {
+                return string.Empty;
+            }
+
+            string description = Perk.PerkDescription(data, doPopup: true, data.Level, 0, enabled: true, active: false);
+            return LocalizeDamageTypeNames(description);
+        }
+
+        private static string LocalizeDamageTypeNames(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            foreach (Enums.DamageType type in Enum.GetValues(typeof(Enums.DamageType)))
+            {
+                if (type == Enums.DamageType.None)
+                {
+                    continue;
+                }
+
+                string raw = Enum.GetName(typeof(Enums.DamageType), type);
+                string localized = GameText.DamageTypeName(type);
+                if (!string.IsNullOrWhiteSpace(raw) && !string.IsNullOrWhiteSpace(localized) && raw != localized)
+                {
+                    text = text.Replace(raw, localized);
+                }
+            }
+
+            return text;
+        }
+
+        private static string BuildDeckSummary(int heroIndex)
+        {
+            Hero hero = AtOManager.Instance != null ? AtOManager.Instance.GetHero(heroIndex) : null;
+            if (hero == null || hero.Cards == null)
+            {
+                return string.Empty;
+            }
+
+            Dictionary<Enums.DamageType, int> damage = new Dictionary<Enums.DamageType, int>();
+            Dictionary<string, EffectCount> effects = new Dictionary<string, EffectCount>();
+            for (int i = 0; i < hero.Cards.Count; i++)
+            {
+                CardData card = Globals.Instance != null ? Globals.Instance.GetCardData(hero.Cards[i], instantiate: false) : null;
+                if (card == null)
+                {
+                    continue;
+                }
+
+                AddDamage(damage, card.DamageType);
+                AddDamage(damage, card.DamageType2);
+                if (card.EnergyRecharge > 0)
+                {
+                    AddPseudoEffect(effects, "energy", GameText.SpriteName("energy"), 1);
+                }
+
+                if (card.Heal > 0)
+                {
+                    AddPseudoEffect(effects, "heal", GameText.SpriteName("heal"), 1);
+                }
+
+                AddEffect(effects, card.Aura);
+                AddEffect(effects, card.AuraSelf);
+                AddEffect(effects, card.Aura2);
+                AddEffect(effects, card.AuraSelf2);
+                AddEffect(effects, card.Aura3);
+                AddEffect(effects, card.AuraSelf3);
+                AddEffect(effects, card.Curse);
+                AddEffect(effects, card.CurseSelf);
+                AddEffect(effects, card.Curse2);
+                AddEffect(effects, card.CurseSelf2);
+                AddEffect(effects, card.Curse3);
+                AddEffect(effects, card.CurseSelf3);
+                AddEffectArray(effects, card.Auras);
+                AddEffectArray(effects, card.Curses);
+            }
+
+            List<string> parts = new List<string>();
+            List<string> damageParts = new List<string>();
+            foreach (KeyValuePair<Enums.DamageType, int> entry in damage)
+            {
+                if (entry.Value > 0)
+                {
+                    damageParts.Add(GameText.DamageTypeName(entry.Key) + " " + entry.Value);
+                }
+            }
+
+            if (damageParts.Count > 0)
+            {
+                parts.Add(Loc.Get("challenge_damage_summary", string.Join(", ", damageParts.ToArray())));
+            }
+
+            List<string> effectParts = new List<string>();
+            foreach (KeyValuePair<string, EffectCount> entry in effects)
+            {
+                if (entry.Value.Count > 0)
+                {
+                    effectParts.Add(entry.Value.Name + " " + entry.Value.Count);
+                }
+            }
+
+            if (effectParts.Count > 0)
+            {
+                parts.Add(Loc.Get("challenge_effect_summary", string.Join(", ", effectParts.ToArray())));
+            }
+
+            return string.Join(" ", parts.ToArray());
+        }
+
+        private static void AddDamage(Dictionary<Enums.DamageType, int> damage, Enums.DamageType type)
+        {
+            if (type == Enums.DamageType.None)
+            {
+                return;
+            }
+
+            int count;
+            damage.TryGetValue(type, out count);
+            damage[type] = count + 1;
+        }
+
+        private static void AddEffect(Dictionary<string, EffectCount> effects, AuraCurseData effect)
+        {
+            if (effect == null)
+            {
+                return;
+            }
+
+            string key = !string.IsNullOrWhiteSpace(effect.Id) ? effect.Id : effect.ACName;
+            AddPseudoEffect(effects, key, Clean(GameText.AuraCurseName(effect)), 1);
+        }
+
+        private static void AddEffectArray(Dictionary<string, EffectCount> effects, CardData.AuraBuffs[] values)
+        {
+            if (values == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                AddEffect(effects, values[i].aura);
+                AddEffect(effects, values[i].auraSelf);
+            }
+        }
+
+        private static void AddEffectArray(Dictionary<string, EffectCount> effects, CardData.CurseDebuffs[] values)
+        {
+            if (values == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < values.Length; i++)
+            {
+                AddEffect(effects, values[i].curse);
+                AddEffect(effects, values[i].curseSelf);
+            }
+        }
+
+        private static void AddPseudoEffect(Dictionary<string, EffectCount> effects, string key, string name, int countToAdd)
+        {
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(name))
+            {
+                return;
+            }
+
+            EffectCount count;
+            if (!effects.TryGetValue(key, out count))
+            {
+                count = new EffectCount { Name = name, Count = 0 };
+            }
+
+            count.Count += countToAdd;
+            effects[key] = count;
+        }
+
         private static PerkData ReadPerkData(PerkChallengeItem item)
         {
             return PerkDataField != null ? PerkDataField.GetValue(item) as PerkData : null;
@@ -911,13 +1185,35 @@ namespace AccessTheObelisk
             }
 
             string source = Clean(hero.SourceName);
-            string subclass = hero.HeroData.HeroSubClass != null ? Clean(hero.HeroData.HeroSubClass.SubClassName) : "";
+            string subclass = hero.HeroData.HeroSubClass != null ? LocalizedSubclassName(hero.HeroData.HeroSubClass) : "";
             if (string.IsNullOrWhiteSpace(source))
             {
                 source = Clean(hero.HeroData.HeroName);
             }
 
             return string.IsNullOrWhiteSpace(subclass) || source == subclass ? source : source + ", " + subclass;
+        }
+
+        private static string LocalizedSubclassName(SubClassData data)
+        {
+            if (data == null)
+            {
+                return string.Empty;
+            }
+
+            string localized = GameText.Get(data.Id);
+            if (string.IsNullOrWhiteSpace(localized))
+            {
+                localized = GameText.Get(data.Id, "class");
+            }
+
+            return string.IsNullOrWhiteSpace(localized) ? Clean(data.SubClassName) : Clean(localized);
+        }
+
+        private struct EffectCount
+        {
+            public string Name;
+            public int Count;
         }
 
         private static bool IsSubmitHeld()

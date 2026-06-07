@@ -13,7 +13,7 @@ Key rules for this project:
 - Official mod name: `AccessTheObelisk`.
 - Engine/runtime: Unity 2022.3.62f2, 64-bit, Mono.
 - Mod loader: BepInEx 5.x, installed in the game directory.
-- Screen reader bridge: `Tolk.dll` and `nvdaControllerClient64.dll` are in the game directory.
+- Screen reader bridge: Prism `v0.16.5`; `prism.dll` is deployed to the game directory.
 - Build: `.\scripts\Build-Mod.ps1`.
 - Build and deploy: `.\scripts\Deploy-Mod.ps1`.
 - For accessibility mod work, prefer the game's existing mechanics, UI, navigation, and controls.

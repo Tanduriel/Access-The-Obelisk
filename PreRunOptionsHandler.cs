@@ -272,7 +272,28 @@ namespace AccessTheObelisk
 
             for (int i = 0; i < texts.Length; i++)
             {
-                AddVisibleText(texts[i], fallback);
+                TMPro.TMP_Text text = texts[i];
+                if (text == null || !IsVisible(text.transform))
+                {
+                    continue;
+                }
+
+                string name = Clean(text.text);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                PopupText popup = text.GetComponent<PopupText>();
+                string description = popup != null ? Clean(popup.text) : "";
+
+                Item item = new Item();
+                item.Kind = ItemKind.Text;
+                item.Label = fallback;
+                item.Details = string.IsNullOrWhiteSpace(description)
+                    ? name
+                    : name + ". " + description;
+                _items.Add(item);
             }
         }
 

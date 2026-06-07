@@ -8,9 +8,9 @@
     <CodePage>65001</CodePage>
     <AssemblyName>AccessTheObelisk</AssemblyName>
     <RootNamespace>AccessTheObelisk</RootNamespace>
-    <Version>0.3.5</Version>
-    <AssemblyVersion>0.3.5.0</AssemblyVersion>
-    <FileVersion>0.3.5.0</FileVersion>
+    <Version>0.4.0</Version>
+    <AssemblyVersion>0.4.0.0</AssemblyVersion>
+    <FileVersion>0.4.0.0</FileVersion>
     <DefaultItemExcludes>$(DefaultItemExcludes);installer\**;bin\**;obj\**;dist\**</DefaultItemExcludes>
   </PropertyGroup>
 
@@ -68,8 +68,20 @@
       <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="UnityEngine.UnityWebRequestModule">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Unity.TextMeshPro">
       <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PhotonUnityNetworking">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\PhotonUnityNetworking.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="PhotonRealtime">
+      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\PhotonRealtime.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

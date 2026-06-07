@@ -1,38 +1,52 @@
-﻿using System;
+using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using UnityEngine;
 
 namespace AccessTheObelisk
 {
     /// <summary>
-    /// Tolk screen reader bridge for NVDA, JAWS, and supported fallback drivers.
+    /// Prism screen reader bridge.
     /// </summary>
     public static class ScreenReader
     {
+        private const int PrismOk = 0;
         private static bool _available;
         private static bool _initialized;
+        private static IntPtr _prismContext;
+        private static IntPtr _prismBackend;
         private static string _lastSpokenForDuplicateCheck;
         private static float _activationDuplicateSuppressUntil;
-        [DllImport("Tolk.dll")]
-        private static extern void Tolk_Load();
 
-        [DllImport("Tolk.dll")]
-        private static extern void Tolk_Unload();
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr prism_init(IntPtr cfg);
 
-        [DllImport("Tolk.dll")]
-        private static extern bool Tolk_HasSpeech();
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void prism_shutdown(IntPtr ctx);
 
-        [DllImport("Tolk.dll", CharSet = CharSet.Unicode)]
-        private static extern bool Tolk_Output(string text, bool interrupt);
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr prism_registry_acquire_best(IntPtr ctx);
 
-        [DllImport("Tolk.dll")]
-        private static extern bool Tolk_Silence();
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void prism_backend_free(IntPtr backend);
 
-        [DllImport("Tolk.dll", CharSet = CharSet.Unicode)]
-        private static extern IntPtr Tolk_DetectScreenReader();
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr prism_backend_name(IntPtr backend);
+
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int prism_backend_output(IntPtr backend, byte[] text, [MarshalAs(UnmanagedType.I1)] bool interrupt);
+
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int prism_backend_speak(IntPtr backend, byte[] text, [MarshalAs(UnmanagedType.I1)] bool interrupt);
+
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int prism_backend_stop(IntPtr backend);
+
+        [DllImport("prism.dll", CallingConvention = CallingConvention.Cdecl)]
+        private static extern IntPtr prism_error_string(int error);
 
         /// <summary>
-        /// Initializes the native Tolk bridge.
+        /// Initializes the native screen reader bridge.
         /// </summary>
         public static void Initialize()
         {
@@ -43,20 +57,13 @@ namespace AccessTheObelisk
 
             try
             {
-                Tolk_Load();
-                _available = Tolk_HasSpeech();
-                Main.Log.LogInfo(_available ? "Tolk initialized with speech support." : "Tolk loaded, but no speech driver reported speech support.");
-
-                IntPtr screenReaderName = Tolk_DetectScreenReader();
-                if (screenReaderName != IntPtr.Zero)
-                {
-                    Main.Log.LogInfo("Detected screen reader: " + Marshal.PtrToStringUni(screenReaderName));
-                }
+                _available = TryInitializePrism();
             }
             catch (Exception ex)
             {
                 _available = false;
-                Main.Log.LogError("Failed to initialize Tolk: " + ex.Message);
+                ShutdownPrism();
+                Main.Log.LogError("Failed to initialize Prism: " + ex.Message);
             }
 
             _initialized = true;
@@ -89,7 +96,7 @@ namespace AccessTheObelisk
 
             try
             {
-                Tolk_Output(text, interrupt);
+                Output(text, interrupt);
             }
             catch (Exception ex)
             {
@@ -117,7 +124,7 @@ namespace AccessTheObelisk
 
             try
             {
-                Tolk_Output(text, false);
+                Output(text, interrupt: false);
             }
             catch (Exception ex)
             {
@@ -144,7 +151,14 @@ namespace AccessTheObelisk
 
             try
             {
-                Tolk_Silence();
+                if (_prismBackend != IntPtr.Zero)
+                {
+                    int error = prism_backend_stop(_prismBackend);
+                    if (error != PrismOk)
+                    {
+                        Main.Log.LogWarning("Prism stop failed: " + PrismError(error));
+                    }
+                }
             }
             catch
             {
@@ -157,6 +171,102 @@ namespace AccessTheObelisk
         public static void SuppressDuplicateActivationSpeech(float seconds = 0.9f)
         {
             _activationDuplicateSuppressUntil = Mathf.Max(_activationDuplicateSuppressUntil, Time.unscaledTime + seconds);
+        }
+
+        /// <summary>
+        /// Shuts down the native screen reader bridge.
+        /// </summary>
+        public static void Shutdown()
+        {
+            if (!_initialized)
+            {
+                return;
+            }
+
+            try
+            {
+                ShutdownPrism();
+            }
+            catch
+            {
+            }
+
+            _available = false;
+            _initialized = false;
+        }
+
+        /// <summary>
+        /// True when a screen reader bridge loaded and reports speech support.
+        /// </summary>
+        public static bool IsAvailable
+        {
+            get { return _available; }
+        }
+
+        private static bool TryInitializePrism()
+        {
+            _prismContext = prism_init(IntPtr.Zero);
+            if (_prismContext == IntPtr.Zero)
+            {
+                Main.Log.LogWarning("Prism initialization failed: context was null.");
+                return false;
+            }
+
+            _prismBackend = prism_registry_acquire_best(_prismContext);
+            if (_prismBackend == IntPtr.Zero)
+            {
+                Main.Log.LogWarning("Prism initialization failed: no usable backend was found.");
+                ShutdownPrism();
+                return false;
+            }
+
+            string backendName = PtrToUtf8String(prism_backend_name(_prismBackend));
+            Main.Log.LogInfo("Prism initialized with backend: " + (string.IsNullOrWhiteSpace(backendName) ? "unknown" : backendName));
+            return true;
+        }
+
+        private static void Output(string text, bool interrupt)
+        {
+            if (_prismBackend == IntPtr.Zero)
+            {
+                return;
+            }
+
+            byte[] utf8Text = ToNullTerminatedUtf8(text);
+            int error = prism_backend_output(_prismBackend, utf8Text, interrupt);
+            if (error == PrismOk)
+            {
+                return;
+            }
+
+            error = prism_backend_speak(_prismBackend, utf8Text, interrupt);
+            if (error != PrismOk)
+            {
+                Main.Log.LogWarning("Prism output failed: " + PrismError(error));
+            }
+        }
+
+        private static void ShutdownPrism()
+        {
+            if (_prismBackend != IntPtr.Zero)
+            {
+                try
+                {
+                    prism_backend_stop(_prismBackend);
+                }
+                catch
+                {
+                }
+
+                prism_backend_free(_prismBackend);
+                _prismBackend = IntPtr.Zero;
+            }
+
+            if (_prismContext != IntPtr.Zero)
+            {
+                prism_shutdown(_prismContext);
+                _prismContext = IntPtr.Zero;
+            }
         }
 
         private static bool ShouldSuppressActivationDuplicate(string text, bool interrupt)
@@ -192,35 +302,36 @@ namespace AccessTheObelisk
                 : text.Trim().TrimEnd('.', '!', '?', ':', ';').Trim();
         }
 
-        /// <summary>
-        /// Shuts down Tolk.
-        /// </summary>
-        public static void Shutdown()
+        private static byte[] ToNullTerminatedUtf8(string text)
         {
-            if (!_initialized)
-            {
-                return;
-            }
-
-            try
-            {
-                Tolk_Unload();
-            }
-            catch
-            {
-            }
-
-            _available = false;
-            _initialized = false;
+            byte[] bytes = Encoding.UTF8.GetBytes(text);
+            byte[] result = new byte[bytes.Length + 1];
+            Buffer.BlockCopy(bytes, 0, result, 0, bytes.Length);
+            return result;
         }
 
-        /// <summary>
-        /// True when Tolk loaded and reports speech support.
-        /// </summary>
-        public static bool IsAvailable
+        private static string PrismError(int error)
         {
-            get { return _available; }
+            string message = PtrToUtf8String(prism_error_string(error));
+            return string.IsNullOrWhiteSpace(message) ? "error " + error : message + " (" + error + ")";
         }
 
+        private static string PtrToUtf8String(IntPtr value)
+        {
+            if (value == IntPtr.Zero)
+            {
+                return "";
+            }
+
+            int length = 0;
+            while (Marshal.ReadByte(value, length) != 0)
+            {
+                length++;
+            }
+
+            byte[] bytes = new byte[length];
+            Marshal.Copy(value, bytes, 0, length);
+            return Encoding.UTF8.GetString(bytes);
+        }
     }
 }

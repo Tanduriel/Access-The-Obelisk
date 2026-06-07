@@ -26,6 +26,7 @@ namespace AccessTheObelisk
         private float _lastRefreshTime;
         private string _lastHeader;
         private string _lastResult;
+        private string _lastWaitingText;
         private readonly HashSet<string> _announcedRollOutcomes = new HashSet<string>();
 
         /// <summary>
@@ -52,6 +53,7 @@ namespace AccessTheObelisk
                 AnnounceEventOnce(manager);
                 AnnounceRollOutcomeIfChanged(manager);
                 AnnounceResultIfChanged(manager);
+                AnnounceWaitingIfChanged(manager);
                 _lastRefreshTime = Time.unscaledTime;
             }
 
@@ -67,7 +69,25 @@ namespace AccessTheObelisk
             _announced = false;
             _lastHeader = null;
             _lastResult = null;
+            _lastWaitingText = null;
             _announcedRollOutcomes.Clear();
+        }
+
+        private void AnnounceWaitingIfChanged(EventManager manager)
+        {
+            string text = manager.waitingMsgText != null && manager.waitingMsgText.gameObject.activeInHierarchy
+                ? Clean(manager.waitingMsgText.text)
+                : "";
+            if (text == _lastWaitingText)
+            {
+                return;
+            }
+
+            _lastWaitingText = text;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                ScreenReader.SayQueued(text);
+            }
         }
 
         private void Refresh(EventManager manager)
@@ -327,13 +347,13 @@ namespace AccessTheObelisk
             bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
             if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
             {
-                MoveLine(-1);
+                MoveLine(1);
                 return;
             }
 
             if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
             {
-                MoveLine(1);
+                MoveLine(-1);
                 return;
             }
 

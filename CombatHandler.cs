@@ -15,7 +15,8 @@ namespace AccessTheObelisk
         {
             Cards,
             Enemies,
-            Party
+            Party,
+            Actions
         }
 
         private enum EnemyBufferFocus
@@ -33,6 +34,8 @@ namespace AccessTheObelisk
             public Transform Target;
             public bool CardDetailsPending;
             public string ActionSelectionLine;
+            public string CombatAction;
+            public ItemCombatIcon ItemIcon;
             public readonly List<string> Lines = new List<string>();
         }
 
@@ -52,6 +55,7 @@ namespace AccessTheObelisk
         private static readonly FieldInfo EnergySelectorMaxEnergyField = AccessTools.Field(typeof(UIEnergySelector), "maxEnergy");
         private static readonly FieldInfo EnergySelectorMaxAssignedField = AccessTools.Field(typeof(UIEnergySelector), "maxEnergyToBeAssigned");
         private static readonly FieldInfo DiscardSelectorNonLimitedField = AccessTools.Field(typeof(UIDiscardSelector), "nonLimitedNumCards");
+        private static readonly FieldInfo ItemCombatIconCardDataField = AccessTools.Field(typeof(ItemCombatIcon), "cardData");
 
         private sealed class TurnOrderItem
         {
@@ -65,6 +69,7 @@ namespace AccessTheObelisk
         private readonly List<BufferItem> _cards = new List<BufferItem>();
         private readonly List<BufferItem> _enemies = new List<BufferItem>();
         private readonly List<BufferItem> _party = new List<BufferItem>();
+        private readonly List<BufferItem> _combatActions = new List<BufferItem>();
         private readonly List<BufferItem> _targets = new List<BufferItem>();
         private readonly List<BufferItem> _actionCards = new List<BufferItem>();
         private readonly Dictionary<string, CharacterSnapshot> _snapshots = new Dictionary<string, CharacterSnapshot>();
@@ -73,6 +78,7 @@ namespace AccessTheObelisk
         private int _cardIndex;
         private int _enemyIndex;
         private int _partyIndex;
+        private int _combatActionIndex;
         private int _targetIndex;
         private int _actionCardIndex;
         private int _lineIndex;
@@ -132,6 +138,7 @@ namespace AccessTheObelisk
             _cardIndex = 0;
             _enemyIndex = 0;
             _partyIndex = 0;
+            _combatActionIndex = 0;
             _targetIndex = 0;
             _actionCardIndex = 0;
             _targetModeAnnounced = false;
@@ -274,7 +281,7 @@ namespace AccessTheObelisk
 
             if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
             {
-                ActivateFocusedCard();
+                ActivateFocusedItem();
             }
         }
 
@@ -472,9 +479,9 @@ namespace AccessTheObelisk
             {
                 zone = 0;
             }
-            else if (zone > 2)
+            else if (zone > 3)
             {
-                zone = 2;
+                zone = 3;
             }
 
             if (zone == (int)_zone)
@@ -759,7 +766,17 @@ namespace AccessTheObelisk
             NPC[] npcs = match.GetTeamNPC();
             if (heroActive >= 0 && heroes != null && heroActive < heroes.Length && heroes[heroActive] != null)
             {
-                string message = Loc.Get("combat_turn_hero", Clean(heroes[heroActive].SourceName));
+                Hero hero = heroes[heroActive];
+                string message;
+                if (GameManager.Instance.IsMultiplayer() && !string.IsNullOrWhiteSpace(hero.Owner) && NetworkManager.Instance != null)
+                {
+                    message = Loc.Get("combat_turn_hero_owner", Clean(hero.SourceName), Clean(NetworkManager.Instance.GetPlayerNickReal(hero.Owner)));
+                }
+                else
+                {
+                    message = Loc.Get("combat_turn_hero", Clean(hero.SourceName));
+                }
+
                 GameEventBuffer.Add(message);
                 ScreenReader.SayQueued(message);
             }
@@ -810,11 +827,110 @@ namespace AccessTheObelisk
             _cards.Clear();
             _enemies.Clear();
             _party.Clear();
+            _combatActions.Clear();
 
             AddCards(match);
             AddCharacters(match.GetTeamNPC(), _enemies);
             AddCharacters(match.GetTeamHero(), _party);
+            AddCombatActions(match);
             ClampIndexes();
+        }
+
+        private void AddCombatActions(MatchManager match)
+        {
+            if (match == null || match.CardDrag)
+            {
+                return;
+            }
+
+            if (match.CountHeroDeck() > 0)
+            {
+                AddSimpleCombatAction("combatdeck", Loc.Get("character_tab_combatdeck"));
+            }
+
+            if (match.CountHeroDiscard() > 0)
+            {
+                AddSimpleCombatAction("combatdiscard", Loc.Get("character_tab_combatdiscard"));
+            }
+
+            if (match.CountHeroVanish() > 0)
+            {
+                AddSimpleCombatAction("combatvanish", Loc.Get("character_tab_combatvanish"));
+            }
+
+            AddItemIconAction(Loc.Get("character_item_weapon"), match.iconWeapon);
+            AddItemIconAction(Loc.Get("character_item_armor"), match.iconArmor);
+            AddItemIconAction(Loc.Get("character_item_jewelry"), match.iconJewelry);
+            AddItemIconAction(Loc.Get("character_item_accessory"), match.iconAccesory);
+            AddItemIconAction(Loc.Get("character_item_pet"), match.iconPet);
+
+            if (match.IsYourTurn() && match.botEndTurn != null && match.botEndTurn.gameObject.activeInHierarchy && Functions.TransformIsVisible(match.botEndTurn))
+            {
+                AddSimpleCombatAction("endturn", Loc.Get("combat_end_turn"));
+            }
+
+            if (!match.MatchIsOver && !match.CombatLoading)
+            {
+                AddSimpleCombatAction("resign", Loc.Get("combat_resign"));
+            }
+        }
+
+        private void AddSimpleCombatAction(string action, string label)
+        {
+            BufferItem item = new BufferItem();
+            item.CombatAction = action;
+            item.Summary = label;
+            AddLine(item, label);
+            _combatActions.Add(item);
+        }
+
+        private void AddItemIconAction(string slotLabel, ItemCombatIcon icon)
+        {
+            if (icon == null || !icon.gameObject.activeInHierarchy || !Functions.TransformIsVisible(icon.transform))
+            {
+                return;
+            }
+
+            BoxCollider2D collider = icon.GetComponent<BoxCollider2D>();
+            if (collider == null || !collider.enabled)
+            {
+                return;
+            }
+
+            BufferItem item = new BufferItem();
+            item.CombatAction = "item";
+            item.ItemIcon = icon;
+            CardData data = ReadItemIconCardData(icon);
+            if (data != null)
+            {
+                item.Summary = Loc.Get("character_item_summary", slotLabel, CardSpeech.BuildItemFocusSummary(data));
+                item.Lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
+            }
+            else
+            {
+                item.Summary = slotLabel;
+                AddLine(item, slotLabel);
+            }
+
+            _combatActions.Add(item);
+        }
+
+        private static CardData ReadItemIconCardData(ItemCombatIcon icon)
+        {
+            if (icon == null || ItemCombatIconCardDataField == null)
+            {
+                return null;
+            }
+
+            try
+            {
+                return ItemCombatIconCardDataField.GetValue(icon) as CardData;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogState("CombatHandler failed to read ItemCombatIcon.cardData: " + ex.Message);
+                return null;
+            }
         }
 
         private void RefreshTargets(MatchManager match)
@@ -1555,10 +1671,25 @@ namespace AccessTheObelisk
             {
                 ScreenReader.Say(Loc.Get("combat_enemies_empty"));
             }
-            else
+            else if (_zone == CombatZone.Party)
             {
                 ScreenReader.Say(Loc.Get("combat_party_empty"));
             }
+            else
+            {
+                ScreenReader.Say(Loc.Get("combat_actions_empty"));
+            }
+        }
+
+        private void ActivateFocusedItem()
+        {
+            if (_zone == CombatZone.Actions)
+            {
+                ActivateFocusedCombatAction();
+                return;
+            }
+
+            ActivateFocusedCard();
         }
 
         private void ActivateFocusedCard()
@@ -1578,6 +1709,58 @@ namespace AccessTheObelisk
             string message = Loc.Get("activated", Clean(item.Card.CardData != null ? item.Card.CardData.CardName : "card"));
             GameEventBuffer.Add(message);
             item.Card.OnMouseUpController();
+        }
+
+        private void ActivateFocusedCombatAction()
+        {
+            MatchManager match = MatchManager.Instance;
+            BufferItem item = CurrentItem();
+            if (item == null)
+            {
+                AnnounceEmptyZone();
+                return;
+            }
+
+            if (item.CombatAction == "endturn")
+            {
+                EndTurnFromKeyboard(match);
+                return;
+            }
+
+            if (item.CombatAction == "resign")
+            {
+                if (match != null)
+                {
+                    match.ResignCombat();
+                }
+
+                return;
+            }
+
+            if (item.CombatAction == "combatdeck" || item.CombatAction == "combatdiscard" || item.CombatAction == "combatvanish")
+            {
+                if (match != null)
+                {
+                    match.ShowCharacterWindow(item.CombatAction);
+                    ScreenReader.Say(Loc.Get("activated", item.Summary));
+                }
+
+                return;
+            }
+
+            if (item.CombatAction == "item" && item.ItemIcon != null)
+            {
+                CardData data = ReadItemIconCardData(item.ItemIcon);
+                if (data != null)
+                {
+                    CardScreenHandler.Open(data);
+                }
+                else
+                {
+                    ScreenReader.Say(Loc.Get("activated", item.Summary));
+                    item.ItemIcon.SendMessage("fOnMouseUp", SendMessageOptions.DontRequireReceiver);
+                }
+            }
         }
 
         private static void EndTurnFromKeyboard(MatchManager match)
@@ -1884,9 +2067,6 @@ namespace AccessTheObelisk
             }
 
             match.SetTarget(item.Target);
-            string message = Loc.Get("combat_target_selected", item.Lines.Count > 0 ? item.Lines[0] : item.Summary);
-            GameEventBuffer.Add(message);
-            ScreenReader.Say(message);
             match.ControllerExecute();
             _targetModeAnnounced = false;
         }
@@ -2503,7 +2683,12 @@ namespace AccessTheObelisk
                 return _cards;
             }
 
-            return _zone == CombatZone.Enemies ? _enemies : _party;
+            if (_zone == CombatZone.Enemies)
+            {
+                return _enemies;
+            }
+
+            return _zone == CombatZone.Party ? _party : _combatActions;
         }
 
         private BufferItem CurrentItem()
@@ -2525,7 +2710,12 @@ namespace AccessTheObelisk
                 return _cardIndex;
             }
 
-            return _zone == CombatZone.Enemies ? _enemyIndex : _partyIndex;
+            if (_zone == CombatZone.Enemies)
+            {
+                return _enemyIndex;
+            }
+
+            return _zone == CombatZone.Party ? _partyIndex : _combatActionIndex;
         }
 
         private void SetCurrentIndex(int index)
@@ -2538,9 +2728,13 @@ namespace AccessTheObelisk
             {
                 _enemyIndex = index;
             }
-            else
+            else if (_zone == CombatZone.Party)
             {
                 _partyIndex = index;
+            }
+            else
+            {
+                _combatActionIndex = index;
             }
         }
 
@@ -2549,6 +2743,7 @@ namespace AccessTheObelisk
             _cardIndex = ClampIndex(_cardIndex, _cards.Count);
             _enemyIndex = ClampIndex(_enemyIndex, _enemies.Count);
             _partyIndex = ClampIndex(_partyIndex, _party.Count);
+            _combatActionIndex = ClampIndex(_combatActionIndex, _combatActions.Count);
         }
 
         private static int ClampIndex(int index, int count)

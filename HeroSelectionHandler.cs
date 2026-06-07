@@ -222,6 +222,8 @@ namespace AccessTheObelisk
                     AddActionButton(manager.menuController[i], Loc.Get("menu_item", manager.menuController[i] != null ? manager.menuController[i].name : ""));
                 }
             }
+
+            AddBackLikeButtons(manager);
         }
 
         private void AddActionButton(Transform transform, string fallback, bool begin = false, bool ready = false)
@@ -241,7 +243,7 @@ namespace AccessTheObelisk
 
             BotonGeneric button = transform.GetComponent<BotonGeneric>();
             string text = ReadButtonText(transform, fallback);
-            if (ContainsAction(text))
+            if (ContainsAction(transform))
             {
                 return;
             }
@@ -255,17 +257,48 @@ namespace AccessTheObelisk
             _actions.Add(action);
         }
 
-        private bool ContainsAction(string summary)
+        private void AddBackLikeButtons(HeroSelectionManager manager)
+        {
+            if (manager == null || manager.allGO == null)
+            {
+                return;
+            }
+
+            BotonGeneric[] buttons = manager.allGO.GetComponentsInChildren<BotonGeneric>(true);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                BotonGeneric button = buttons[i];
+                if (button == null || !IsBackLikeButton(button))
+                {
+                    continue;
+                }
+
+                AddActionButton(button.transform, ReadButtonText(button.transform, button.gameObject.name));
+            }
+        }
+
+        private bool ContainsAction(Transform transform)
         {
             for (int i = 0; i < _actions.Count; i++)
             {
-                if (_actions[i].Summary == summary)
+                if (_actions[i].Transform == transform)
                 {
                     return true;
                 }
             }
 
             return false;
+        }
+
+        private static bool IsBackLikeButton(BotonGeneric button)
+        {
+            string probe = ((button.gameObject.name ?? "") + " " + (button.idTranslate ?? "") + " " + (button.auxString ?? "")).ToLowerInvariant();
+            return probe.Contains("mainmenu") ||
+                probe.Contains("back") ||
+                probe.Contains("return") ||
+                probe.Contains("close") ||
+                probe.Contains("exit") ||
+                probe.Contains("cancel");
         }
 
         private void ProcessKeys(HeroSelectionManager manager)
@@ -291,6 +324,12 @@ namespace AccessTheObelisk
                 (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
             {
                 AdjustMadnessFromHeroSelection(manager, Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
+                return;
+            }
+
+            if (shift && _zone == SelectionZone.Party && (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
+            {
+                AdjustPartySlotOwner(manager, Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
                 return;
             }
 
@@ -524,6 +563,55 @@ namespace AccessTheObelisk
             {
                 ScreenReader.Say(Loc.Get("hero_selection_slot_target", slot.GetId() + 1));
             }
+        }
+
+        private void AdjustPartySlotOwner(HeroSelectionManager manager, int delta)
+        {
+            if (manager == null || !GameManager.Instance.IsMultiplayer())
+            {
+                ScreenReader.Say(Loc.Get("hero_selection_owner_single_player"));
+                return;
+            }
+
+            if (NetworkManager.Instance == null || !NetworkManager.Instance.IsMaster())
+            {
+                ScreenReader.Say(Loc.Get("hero_selection_owner_master_only"));
+                return;
+            }
+
+            BoxSelection slot = CurrentPartySlot();
+            if (slot == null || NetworkManager.Instance.PlayerList == null || NetworkManager.Instance.PlayerList.Length == 0)
+            {
+                ScreenReader.Say(Loc.Get("hero_selection_no_slot"));
+                return;
+            }
+
+            int currentIndex = 0;
+            string currentOwner = slot.GetOwner();
+            for (int i = 0; i < NetworkManager.Instance.PlayerList.Length; i++)
+            {
+                if (NetworkManager.Instance.PlayerList[i] != null && NetworkManager.Instance.PlayerList[i].NickName == currentOwner)
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            int nextIndex = currentIndex + delta;
+            if (nextIndex < 0)
+            {
+                nextIndex = NetworkManager.Instance.PlayerList.Length - 1;
+            }
+            else if (nextIndex >= NetworkManager.Instance.PlayerList.Length)
+            {
+                nextIndex = 0;
+            }
+
+            string nextOwner = NetworkManager.Instance.PlayerList[nextIndex].NickName;
+            manager.AssignPlayerToBox(nextOwner, slot.GetId());
+            Refresh(manager);
+            ScreenReader.Say(Loc.Get("hero_selection_owner_assigned", slot.GetId() + 1, NetworkManager.Instance.GetPlayerNickReal(nextOwner)));
+            AnnounceFocused(true);
         }
 
         private void ActivateHero(HeroSelectionManager manager)
@@ -964,8 +1052,18 @@ namespace AccessTheObelisk
             HeroSelection assigned = HeroSelectionManager.Instance.GetBoxHeroFromIndex(slot.GetId());
             string hero = assigned != null ? GetHeroText(assigned) : Loc.Get("empty_slot");
             string owner = Clean(slot.playerOwner != null ? slot.playerOwner.text : "");
-            string target = slot.GetId() == _targetSlot ? Loc.Get("hero_selection_current_target") : "";
-            return Loc.Get("hero_selection_party_focus", slot.GetId() + 1, hero, owner, target);
+            List<string> states = new List<string>();
+            if (GameManager.Instance.IsMultiplayer() && !string.IsNullOrWhiteSpace(slot.GetOwner()) && NetworkManager.Instance != null)
+            {
+                states.Add(Loc.Get(NetworkManager.Instance.IsPlayerReady(slot.GetOwner()) ? "hero_selection_owner_ready" : "hero_selection_owner_not_ready"));
+            }
+
+            if (slot.GetId() == _targetSlot)
+            {
+                states.Add(Loc.Get("hero_selection_current_target"));
+            }
+
+            return Loc.Get("hero_selection_party_focus", slot.GetId() + 1, hero, owner, string.Join(" ", states.ToArray()));
         }
 
         private string HeroFocusText()
@@ -1371,6 +1469,15 @@ namespace AccessTheObelisk
             if (!string.IsNullOrWhiteSpace(text))
             {
                 return text;
+            }
+
+            if (button != null && Texts.Instance != null && !string.IsNullOrWhiteSpace(button.idTranslate))
+            {
+                text = Clean(Texts.Instance.GetText(button.idTranslate));
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
             }
 
             TMP_Text childText = transform != null ? transform.GetComponentInChildren<TMP_Text>(true) : null;

@@ -6,7 +6,7 @@ on:
       version:
         description: Release version
         required: true
-        default: 0.3.5
+        default: 0.4
 
 jobs:
   build:
@@ -16,20 +16,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          dotnet-version: 8.0.x
+          targets: x86_64-pc-windows-msvc
 
       - name: Build installer
         shell: pwsh
         run: .\scripts\Build-Installer.ps1 -Configuration Release
-
-      - name: Package installer
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path .\dist | Out-Null
-          Copy-Item -LiteralPath .\installer\AccessTheObelisk.Installer\bin\Release\net8.0-windows\win-x64\publish\AccessTheObelisk.Installer.exe -Destination .\dist\AccessTheObelisk.Installer.exe -Force
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4

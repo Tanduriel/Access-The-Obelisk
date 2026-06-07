@@ -426,7 +426,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private void MoveZone(int delta)
+        private bool MoveZone(int delta)
         {
             int start = (int)_zone;
             for (int zone = start + delta; zone >= 0 && zone < 3; zone += delta)
@@ -437,11 +437,11 @@ namespace AccessTheObelisk
                     _zone = candidate;
                     _lineIndex = 0;
                     AnnounceFocused();
-                    return;
+                    return true;
                 }
             }
 
-            ScreenReader.Say(Loc.Get("perk_no_item"));
+            return false;
         }
 
         private void MovePerkRow(int delta)
@@ -461,7 +461,15 @@ namespace AccessTheObelisk
                 return;
             }
 
-            MoveZone(delta);
+            if (MoveZone(delta))
+            {
+                return;
+            }
+
+            if (_perkRows.Count == 1)
+            {
+                AnnounceFocused();
+            }
         }
 
         private void NormalizePerkRow(int direction)

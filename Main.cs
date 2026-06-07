@@ -9,13 +9,18 @@ namespace AccessTheObelisk
     /// <summary>
     /// Main BepInEx entry point for the Across the Obelisk accessibility mod.
     /// </summary>
-    [BepInPlugin("com.incognitus.accesstheobelisk", "AccessTheObelisk", "0.3.5")]
+    [BepInPlugin(PluginGuid, "AccessTheObelisk", PluginVersion)]
     public sealed class Main : BaseUnityPlugin
     {
         /// <summary>
         /// Stable plugin identifier used for Harmony ownership.
         /// </summary>
         public const string PluginGuid = "com.incognitus.accesstheobelisk";
+
+        /// <summary>
+        /// Current mod version used by BepInEx and the update checker.
+        /// </summary>
+        public const string PluginVersion = "0.4";
 
         private float _startupTimer;
         private float _lastMemoryLogTime;
@@ -39,16 +44,21 @@ namespace AccessTheObelisk
         private FinishRunHandler _finishRunHandler;
         private PerkTreeHandler _perkTreeHandler;
         private CorruptionHandler _corruptionHandler;
+        private ConflictHandler _conflictHandler;
         private CharacterInfoHandler _characterInfoHandler;
         private CharacterDeckHandler _characterDeckHandler;
+        private CardScreenHandler _cardScreenHandler;
         private TomeHandler _tomeHandler;
         private ParadoxDocumentHandler _paradoxDocumentHandler;
+        private LobbyHandler _lobbyHandler;
+        private GiveHandler _giveHandler;
         private StoryIntroHandler _storyIntroHandler;
         private CinematicHandler _cinematicHandler;
         private CurrencyHotkeyHandler _currencyHotkeyHandler;
         private QuestRequirementHandler _questRequirementHandler;
         private CombatModalHandler _combatModalHandler;
         private CombatHandler _combatHandler;
+        private UpdateCheckHandler _updateCheckHandler;
 
         /// <summary>
         /// Enables verbose accessibility logging.
@@ -91,16 +101,21 @@ namespace AccessTheObelisk
             _finishRunHandler = new FinishRunHandler();
             _perkTreeHandler = new PerkTreeHandler();
             _corruptionHandler = new CorruptionHandler();
+            _conflictHandler = new ConflictHandler();
             _characterInfoHandler = new CharacterInfoHandler();
             _characterDeckHandler = new CharacterDeckHandler();
+            _cardScreenHandler = new CardScreenHandler();
             _tomeHandler = new TomeHandler();
             _paradoxDocumentHandler = new ParadoxDocumentHandler();
+            _lobbyHandler = new LobbyHandler();
+            _giveHandler = new GiveHandler();
             _storyIntroHandler = new StoryIntroHandler();
             _cinematicHandler = new CinematicHandler();
             _currencyHotkeyHandler = new CurrencyHotkeyHandler();
             _questRequirementHandler = new QuestRequirementHandler();
             _combatModalHandler = new CombatModalHandler();
             _combatHandler = new CombatHandler();
+            _updateCheckHandler = new UpdateCheckHandler();
             ApplyPatches();
             SceneManager.sceneLoaded += OnSceneLoaded;
             Logger.LogInfo("AccessTheObelisk initialized.");
@@ -154,6 +169,11 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (_cardScreenHandler.Update())
+            {
+                return;
+            }
+
             if (_characterInfoHandler.Update())
             {
                 return;
@@ -189,6 +209,11 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (_giveHandler.Update())
+            {
+                return;
+            }
+
             if (_cardPlayerHandler.Update())
             {
                 return;
@@ -209,7 +234,17 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (_conflictHandler.Update())
+            {
+                return;
+            }
+
             _mainMenuHandler.Update();
+            if (_lobbyHandler.Update())
+            {
+                return;
+            }
+
             if (_preRunOptionsHandler.Update())
             {
                 return;
@@ -336,6 +371,7 @@ namespace AccessTheObelisk
 
             _startupAnnounced = true;
             ScreenReader.Say(Loc.Get("mod_loaded"));
+            _updateCheckHandler.Begin();
         }
 
         private void ApplyPatches()

@@ -70,13 +70,13 @@ namespace AccessTheObelisk
 
                 if (Input.GetKeyDown(KeyCode.UpArrow))
                 {
-                    Move(-1);
+                    Move(1);
                     return true;
                 }
 
                 if (Input.GetKeyDown(KeyCode.DownArrow))
                 {
-                    Move(1);
+                    Move(-1);
                     return true;
                 }
 
@@ -118,13 +118,13 @@ namespace AccessTheObelisk
 
             if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                Move(-1);
+                Move(1);
                 return true;
             }
 
             if (Input.GetKeyDown(KeyCode.DownArrow))
             {
-                Move(1);
+                Move(-1);
                 return true;
             }
 

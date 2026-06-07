@@ -401,6 +401,12 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (!CanChooseReward(rewards, item.CharacterIndex))
+            {
+                ScreenReader.Say(Loc.Get("reward_not_owner", RewardOwnerName(rewards, item.CharacterIndex)));
+                return;
+            }
+
             string message = Loc.Get("activated", item.Lines.Count > 0 ? item.Lines[0] : item.Summary);
             GameEventBuffer.Add(message);
             ScreenReader.Say(message);
@@ -423,6 +429,15 @@ namespace AccessTheObelisk
             if (string.IsNullOrWhiteSpace(name))
             {
                 name = Loc.Get("unknown_hero");
+            }
+
+            RewardsManager rewards = RewardsManager.Instance;
+            if (GameManager.Instance != null && GameManager.Instance.IsMultiplayer() && rewards != null)
+            {
+                string owner = RewardOwnerName(rewards, CurrentCharacterIndex());
+                string key = CanChooseReward(rewards, CurrentCharacterIndex()) ? "reward_character_owner" : "reward_character_owner_read_only";
+                ScreenReader.Say(Loc.Get(key, name, owner));
+                return;
             }
 
             ScreenReader.Say(Loc.Get("reward_character", name));
@@ -485,6 +500,53 @@ namespace AccessTheObelisk
         {
             RewardItem item = CurrentItem();
             return item != null ? item.Lines.Count : 0;
+        }
+
+        private static bool CanChooseReward(RewardsManager rewards, int characterIndex)
+        {
+            if (GameManager.Instance == null || !GameManager.Instance.IsMultiplayer())
+            {
+                return true;
+            }
+
+            string owner = RewardOwnerNick(rewards, characterIndex);
+            if (string.IsNullOrWhiteSpace(owner) || NetworkManager.Instance == null)
+            {
+                return false;
+            }
+
+            return owner == NetworkManager.Instance.GetPlayerNick();
+        }
+
+        private static string RewardOwnerName(RewardsManager rewards, int characterIndex)
+        {
+            string owner = RewardOwnerNick(rewards, characterIndex);
+            if (string.IsNullOrWhiteSpace(owner))
+            {
+                return Loc.Get("unknown_player");
+            }
+
+            if (NetworkManager.Instance != null)
+            {
+                string realName = NetworkManager.Instance.GetPlayerNickReal(owner);
+                if (!string.IsNullOrWhiteSpace(realName))
+                {
+                    return Clean(realName);
+                }
+            }
+
+            return Clean(owner);
+        }
+
+        private static string RewardOwnerNick(RewardsManager rewards, int characterIndex)
+        {
+            if (rewards == null || rewards.theTeam == null || characterIndex < 0 || characterIndex >= rewards.theTeam.Length)
+            {
+                return "";
+            }
+
+            Hero hero = rewards.theTeam[characterIndex];
+            return hero != null ? hero.Owner : "";
         }
 
         private static void AddLine(RewardItem item, string line)

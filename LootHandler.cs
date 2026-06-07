@@ -32,6 +32,7 @@ namespace AccessTheObelisk
         }
 
         private static readonly FieldInfo ActiveCharacterField = AccessTools.Field(typeof(LootManager), "activeCharacter");
+        private static readonly FieldInfo CharacterOrderField = AccessTools.Field(typeof(LootManager), "characterOrder");
 
         private readonly List<int> _characters = new List<int>();
         private readonly List<LootItem> _items = new List<LootItem>();
@@ -457,6 +458,12 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (!CanChooseLoot(loot, currentCharacter))
+            {
+                ScreenReader.Say(Loc.Get("loot_not_owner", LootOwnerName(loot, currentCharacter)));
+                return;
+            }
+
             string message = Loc.Get("activated", FocusSummary(item));
             GameEventBuffer.Add(message);
             ScreenReader.Say(message);
@@ -506,6 +513,15 @@ namespace AccessTheObelisk
             if (string.IsNullOrWhiteSpace(name))
             {
                 name = Loc.Get("unknown_hero");
+            }
+
+            LootManager loot = LootManager.Instance;
+            if (GameManager.Instance != null && GameManager.Instance.IsMultiplayer() && loot != null)
+            {
+                string owner = LootOwnerName(loot, CurrentCharacterIndex());
+                string key = CanChooseLoot(loot, CurrentCharacterIndex()) ? "loot_character_owner" : "loot_character_owner_read_only";
+                ScreenReader.Say(Loc.Get(key, name, owner));
+                return;
             }
 
             ScreenReader.Say(Loc.Get("loot_character", name));
@@ -591,7 +607,87 @@ namespace AccessTheObelisk
                 return null;
             }
 
-            return AtOManager.Instance.GetHero(index);
+            int heroIndex = LootHeroIndex(LootManager.Instance, index);
+            return heroIndex >= 0 ? AtOManager.Instance.GetHero(heroIndex) : null;
+        }
+
+        private static bool CanChooseLoot(LootManager loot, int characterIndex)
+        {
+            if (GameManager.Instance == null || !GameManager.Instance.IsMultiplayer())
+            {
+                return true;
+            }
+
+            string owner = LootOwnerNick(loot, characterIndex);
+            if (string.IsNullOrWhiteSpace(owner) || NetworkManager.Instance == null)
+            {
+                return false;
+            }
+
+            return owner == NetworkManager.Instance.GetPlayerNick();
+        }
+
+        private static string LootOwnerName(LootManager loot, int characterIndex)
+        {
+            string owner = LootOwnerNick(loot, characterIndex);
+            if (string.IsNullOrWhiteSpace(owner))
+            {
+                return Loc.Get("unknown_player");
+            }
+
+            if (NetworkManager.Instance != null)
+            {
+                string realName = NetworkManager.Instance.GetPlayerNickReal(owner);
+                if (!string.IsNullOrWhiteSpace(realName))
+                {
+                    return Clean(realName);
+                }
+            }
+
+            return Clean(owner);
+        }
+
+        private static string LootOwnerNick(LootManager loot, int characterIndex)
+        {
+            if (AtOManager.Instance == null)
+            {
+                return "";
+            }
+
+            int heroIndex = LootHeroIndex(loot, characterIndex);
+            if (heroIndex < 0)
+            {
+                return "";
+            }
+
+            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            return hero != null ? hero.Owner : "";
+        }
+
+        private static int LootHeroIndex(LootManager loot, int characterIndex)
+        {
+            if (characterIndex < 0)
+            {
+                return -1;
+            }
+
+            if (loot != null && CharacterOrderField != null)
+            {
+                try
+                {
+                    List<int> order = CharacterOrderField.GetValue(loot) as List<int>;
+                    if (order != null && characterIndex < order.Count)
+                    {
+                        return order[characterIndex];
+                    }
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.LogState("LootHandler failed to read characterOrder: " + ex.Message);
+                }
+            }
+
+            return characterIndex <= 3 ? characterIndex : -1;
         }
 
         private static void AddItemNumberLine(LootBuffer buffer, string key, int value)

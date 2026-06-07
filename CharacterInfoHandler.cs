@@ -887,9 +887,7 @@ namespace AccessTheObelisk
 
             if (item.Card != null && item.Card.CardData != null && CardScreenManager.Instance != null)
             {
-                CardScreenManager.Instance.ShowCardScreen(_state: true);
-                CardScreenManager.Instance.SetCardData(item.Card.CardData);
-                ScreenReader.Say(Loc.Get("character_card_detail", Clean(item.Card.CardData.CardName)));
+                CardScreenHandler.Open(item.Card.CardData);
                 return;
             }
 
@@ -920,6 +918,12 @@ namespace AccessTheObelisk
             if (heroIndex < 0 || AtOManager.Instance == null)
             {
                 ScreenReader.Say(Loc.Get("character_window_unavailable"));
+                return;
+            }
+
+            if (!CanLevelUpHero(heroIndex))
+            {
+                ScreenReader.Say(Loc.Get("character_level_not_owner", HeroOwnerName(heroIndex)));
                 return;
             }
 
@@ -1068,6 +1072,53 @@ namespace AccessTheObelisk
             }
 
             return AtOManager.Instance.GetHero(window.heroIndex);
+        }
+
+        private static bool CanLevelUpHero(int heroIndex)
+        {
+            if (GameManager.Instance == null || !GameManager.Instance.IsMultiplayer())
+            {
+                return true;
+            }
+
+            if (AtOManager.Instance == null || NetworkManager.Instance == null)
+            {
+                return false;
+            }
+
+            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            if (hero == null || string.IsNullOrWhiteSpace(hero.Owner))
+            {
+                return false;
+            }
+
+            return hero.Owner == NetworkManager.Instance.GetPlayerNick();
+        }
+
+        private static string HeroOwnerName(int heroIndex)
+        {
+            if (AtOManager.Instance == null)
+            {
+                return Loc.Get("unknown_player");
+            }
+
+            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            string owner = hero != null ? hero.Owner : "";
+            if (string.IsNullOrWhiteSpace(owner))
+            {
+                return Loc.Get("unknown_player");
+            }
+
+            if (NetworkManager.Instance != null)
+            {
+                string realName = NetworkManager.Instance.GetPlayerNickReal(owner);
+                if (!string.IsNullOrWhiteSpace(realName))
+                {
+                    return Clean(realName);
+                }
+            }
+
+            return Clean(owner);
         }
 
         private void AnnounceFocusedItem(bool queued = false)

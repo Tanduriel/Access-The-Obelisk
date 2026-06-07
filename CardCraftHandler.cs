@@ -986,7 +986,7 @@ namespace AccessTheObelisk
             item.CardData = data;
             AddItemOverviewBuffer(item, data);
             AddItemEffectBuffer(item, data);
-            AddLine(item, card.Available && card.Enabled ? Loc.Get("available") : Loc.Get("unavailable"));
+            AddArmoryItemAvailabilityLines(item, card, data);
             AddArmoryItemCostLines(item, card, data);
             BotonGeneric button = card.buttonItem != null ? card.buttonItem.GetComponent<BotonGeneric>() : null;
             if (button != null)
@@ -1031,6 +1031,21 @@ namespace AccessTheObelisk
             }
         }
 
+        private static void AddArmoryItemAvailabilityLines(CraftItem item, CardCraftItem card, CardData data)
+        {
+            if (card == null)
+            {
+                return;
+            }
+
+            AddLine(item, card.Available && card.Enabled ? Loc.Get("available") : Loc.Get("unavailable"));
+            string reason = ArmoryUnavailableReason(CardCraftManager.Instance, item, card, data);
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                AddLine(item, reason);
+            }
+        }
+
         private static string ArmoryItemCostText(CardCraftManager craft, CardData data, bool includeGold)
         {
             int cost = ArmoryItemCost(craft, data);
@@ -1058,7 +1073,7 @@ namespace AccessTheObelisk
             try
             {
                 int zoneTier = CraftTierZoneField != null ? (int)CraftTierZoneField.GetValue(craft) : 0;
-                string rarity = GameText.CardRarityName(data.CardRarity);
+                string rarity = Enum.GetName(typeof(Enums.CardRarity), data.CardRarity);
                 object[] args = new object[] { "Item", rarity ?? "", data.Id ?? "", zoneTier, true };
                 return (int)SetPriceMethod.Invoke(craft, args);
             }
@@ -1071,9 +1086,39 @@ namespace AccessTheObelisk
 
         private static string ArmoryUnavailableText(CardCraftManager craft, CraftItem item)
         {
+            return ArmoryUnavailableReason(craft, item, item != null ? item.CraftCard : null, item != null ? item.CardData : null)
+                ?? Loc.Get("menu_item_unavailable", item != null ? item.Summary : Loc.Get("craft_no_item"));
+        }
+
+        private static string ArmoryUnavailableReason(CardCraftManager craft, CraftItem item, CardCraftItem card, CardData data)
+        {
             if (item == null)
             {
                 return Loc.Get("craft_no_item");
+            }
+
+            data = data ?? item.CardData;
+            card = card ?? item.CraftCard;
+            if (data != null && data.CardType == Enums.CardType.Pet)
+            {
+                if (card != null && card.lockIcon != null && card.lockIcon.gameObject.activeInHierarchy && card.lockPopup != null)
+                {
+                    string lockText = Clean(card.lockPopup.text);
+                    if (!string.IsNullOrWhiteSpace(lockText))
+                    {
+                        return lockText;
+                    }
+                }
+
+                if (PlayerManager.Instance != null && !PlayerManager.Instance.IsCardUnlocked(data.Id))
+                {
+                    return Loc.Get("armory_pet_locked");
+                }
+
+                if (AtOManager.Instance != null && AtOManager.Instance.TeamHaveItem(data.Id, 5, true))
+                {
+                    return Loc.Get("armory_pet_already_owned");
+                }
             }
 
             int cost = ArmoryItemCost(craft, item.CardData);
@@ -1083,7 +1128,7 @@ namespace AccessTheObelisk
                 return Loc.Get("armory_not_enough_gold", cost, gold);
             }
 
-            return Loc.Get("menu_item_unavailable", item.Summary);
+            return null;
         }
 
         private static CraftItem BuildDivinationItem(BotonGeneric button)
@@ -1734,9 +1779,7 @@ namespace AccessTheObelisk
 
             if (item.ItemIcon != null && item.CardData != null)
             {
-                CardScreenManager.Instance.ShowCardScreen(_state: true);
-                CardScreenManager.Instance.SetCardData(item.CardData);
-                ScreenReader.Say(Loc.Get("deck_card_detail", CardSpeech.BuildItemFocusSummary(item.CardData)));
+                CardScreenHandler.Open(item.CardData);
                 return;
             }
 

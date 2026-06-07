@@ -24,6 +24,7 @@ namespace AccessTheObelisk
         private int _lineIndex;
         private bool _announced;
         private static bool _openedByShowTome;
+        private static bool _blockCloseUntilEscapeRelease;
         private string _lastSection = "";
         private int _lastCount;
         private float _lastRefreshTime;
@@ -101,6 +102,14 @@ namespace AccessTheObelisk
 
             if (tome.IsActive())
             {
+                if (CanReattachOpenTome(tome))
+                {
+                    _openedByShowTome = true;
+                    ScreenReader.Say(Loc.Get("tome_opened"));
+                    ResetForNewView();
+                    return true;
+                }
+
                 ScreenReader.Say(Loc.Get("tome_already_open"));
                 return true;
             }
@@ -120,6 +129,11 @@ namespace AccessTheObelisk
         private static bool IsAccessibleTomeOpen(TomeManager tome)
         {
             return tome != null && _openedByShowTome && tome.IsActive() && tome.content != null && IsVisible(tome.content.transform);
+        }
+
+        private static bool CanReattachOpenTome(TomeManager tome)
+        {
+            return tome != null && !_openedByShowTome && tome.IsActive() && tome.content != null && IsVisible(tome.content.transform);
         }
 
         private static bool CanOpenTome()
@@ -776,9 +790,7 @@ namespace AccessTheObelisk
 
             if (item.Card != null && CardScreenManager.Instance != null)
             {
-                CardScreenManager.Instance.ShowCardScreen(_state: true);
-                CardScreenManager.Instance.SetCardData(item.Card);
-                ScreenReader.Say(Loc.Get("tome_card_detail", Clean(item.Card.CardName)));
+                CardScreenHandler.Open(item.Card);
                 return;
             }
 
@@ -1091,6 +1103,42 @@ namespace AccessTheObelisk
             _openedByShowTome = state;
         }
 
+        internal static bool IsOpenForEscapeGuard()
+        {
+            TomeManager tome = TomeManager.Instance;
+            return tome != null && tome.IsActive() && tome.content != null && IsVisible(tome.content.transform);
+        }
+
+        internal static void BlockTomeCloseUntilEscapeRelease()
+        {
+            if (IsOpenForEscapeGuard())
+            {
+                _blockCloseUntilEscapeRelease = true;
+            }
+        }
+
+        internal static bool ShouldBlockTomeClose()
+        {
+            if (CardScreenManager.Instance != null && CardScreenManager.Instance.IsActive() && IsOpenForEscapeGuard())
+            {
+                _blockCloseUntilEscapeRelease = true;
+                return true;
+            }
+
+            if (!_blockCloseUntilEscapeRelease)
+            {
+                return false;
+            }
+
+            if (Input.GetKey(KeyCode.Escape))
+            {
+                return true;
+            }
+
+            _blockCloseUntilEscapeRelease = false;
+            return false;
+        }
+
         private static int ClampIndex(int index, int count)
         {
             if (count <= 0)
@@ -1120,9 +1168,36 @@ namespace AccessTheObelisk
     [HarmonyPatch(typeof(TomeManager), nameof(TomeManager.ShowTome))]
     internal static class TomeManagerShowTomePatch
     {
-        private static void Postfix(bool _status)
+        private static bool Prefix(bool _status, ref bool __state)
         {
-            TomeHandler.NotifyShowTome(_status);
+            __state = true;
+            if (!_status && TomeHandler.ShouldBlockTomeClose())
+            {
+                __state = false;
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void Postfix(bool _status, bool __state)
+        {
+            if (__state)
+            {
+                TomeHandler.NotifyShowTome(_status);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(GameManager), nameof(GameManager.EscapeFunction))]
+    internal static class GameManagerEscapeFunctionTomeCardScreenPatch
+    {
+        private static void Prefix()
+        {
+            if (CardScreenManager.Instance != null && CardScreenManager.Instance.IsActive() && TomeHandler.IsOpenForEscapeGuard())
+            {
+                TomeHandler.BlockTomeCloseUntilEscapeRelease();
+            }
         }
     }
 }

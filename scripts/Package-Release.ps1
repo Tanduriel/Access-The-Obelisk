@@ -1,8 +1,9 @@
 param(
     [string]$Configuration = "Release",
-    [string]$Version = "0.3.5",
+    [string]$Version = "0.4",
     [string]$OutputDirectory = "",
-    [string]$RussianLocalizationZip = "C:\Users\Incognitus\Downloads\AcrossTheObelisk_Russian_v1.2.1.zip"
+    [string]$RussianLocalizationZip = "C:\Users\Incognitus\Downloads\AcrossTheObelisk_Russian_v1.2.1.zip",
+    [string]$ReleaseDocsDirectory = "D:\Access_the_Obelisk_V_0.3.5-Fix2\docs"
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,11 +41,31 @@ if (Test-Path -LiteralPath $zipPath) {
 
 $modTarget = Join-Path $stageRoot "BepInEx\plugins\AccessTheObelisk"
 $locTarget = Join-Path $modTarget "Localization"
+$bepInExRuntime = Join-Path $projectRoot "third_party\bepinexpack-acrosstheobelisk\v5.4.23"
+
+if (-not (Test-Path -LiteralPath $bepInExRuntime)) {
+    Write-Error "BepInExPack_AcrossTheObelisk runtime not found at $bepInExRuntime"
+    exit 1
+}
+
+New-Item -ItemType Directory -Force -Path $stageRoot | Out-Null
+Get-ChildItem -LiteralPath $bepInExRuntime -Force | ForEach-Object {
+    Copy-Item -LiteralPath $_.FullName -Destination $stageRoot -Recurse -Force
+}
+
 New-Item -ItemType Directory -Force -Path $locTarget | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $projectRoot "bin\$Configuration\net472\AccessTheObelisk.dll") -Destination $modTarget -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot "Localization\en.txt") -Destination $locTarget -Force
 Copy-Item -LiteralPath (Join-Path $projectRoot "Localization\ru.txt") -Destination $locTarget -Force
+Copy-Item -LiteralPath (Join-Path $projectRoot "third_party\prism\v0.16.5\windows-x64\prism.dll") -Destination $stageRoot -Force
+
+if (Test-Path -LiteralPath $ReleaseDocsDirectory) {
+    Copy-Item -LiteralPath $ReleaseDocsDirectory -Destination $stageRoot -Recurse -Force
+} else {
+    Write-Error "Release docs directory not found: $ReleaseDocsDirectory"
+    exit 1
+}
 
 $files = Get-ChildItem -LiteralPath $stageRoot -Recurse -File | ForEach-Object {
     $relativePath = $_.FullName.Substring($stageRoot.Length + 1).Replace('\', '/')

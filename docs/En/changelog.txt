@@ -1,5 +1,6 @@
 Unreleased
 
+Improved the Obelisk Challenge start screen.
 Fixed localization loading after the installer/release structure change. The mod now finds txt localization files both when installed in BepInEx\plugins\AccessTheObelisk\Localization and when using the previous legacy layout.
 No GitHub release has been created for this change yet.
 
