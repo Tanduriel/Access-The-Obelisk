@@ -56,6 +56,11 @@ const ID_INSTALL_RU: i32 = 1005;
 const ID_VERSION_LIST: i32 = 2001;
 const ID_OK: i32 = 2002;
 const ID_CANCEL: i32 = 2003;
+const ES_MULTILINE: u32 = 0x0004;
+const ES_AUTOVSCROLL: u32 = 0x0040;
+const ES_READONLY: u32 = 0x0800;
+const EM_SETSEL: u32 = 0x00B1;
+const EM_SCROLLCARET: u32 = 0x00B7;
 
 #[derive(Clone, Copy)]
 enum Lang {
@@ -802,7 +807,8 @@ fn select_release_dialog(owner: HWND, lang: Lang, releases: &[ReleaseInfo]) -> O
         create_button(hwnd, tr(lang, Text::Cancel), 422, 295, 110, 32, ID_CANCEL);
         ShowWindow(hwnd, SW_SHOW);
         EnableWindow(owner, 0);
-        run_modal_loop(owner, hwnd, &state);
+        SetFocus(state.list.get());
+        run_modal_loop(owner, &state);
         EnableWindow(owner, 1);
         DestroyWindow(hwnd);
     }
@@ -826,14 +832,21 @@ fn show_changelog_dialog(owner: HWND, lang: Lang, release: &ReleaseInfo) -> bool
     let text = if release.changelog.trim().is_empty() {
         tr(lang, Text::NoChangelog).to_string()
     } else {
-        release.changelog.clone()
+        windows_multiline_text(&release.changelog)
     };
 
     unsafe {
-        create_control(
+        let changelog_edit = create_control(
             "EDIT",
             &text,
-            WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP | WS_VSCROLL | 0x0800 | 0x0040,
+            WS_CHILD
+                | WS_VISIBLE
+                | WS_BORDER
+                | WS_TABSTOP
+                | WS_VSCROLL
+                | ES_MULTILINE
+                | ES_AUTOVSCROLL
+                | ES_READONLY,
             WS_EX_CLIENTEDGE,
             12,
             12,
@@ -846,7 +859,10 @@ fn show_changelog_dialog(owner: HWND, lang: Lang, release: &ReleaseInfo) -> bool
         create_button(hwnd, tr(lang, Text::Cancel), 562, 426, 110, 32, ID_CANCEL);
         ShowWindow(hwnd, SW_SHOW);
         EnableWindow(owner, 0);
-        run_modal_loop(owner, hwnd, &state);
+        SendMessageW(changelog_edit, EM_SETSEL, 0, 0);
+        SendMessageW(changelog_edit, EM_SCROLLCARET, 0, 0);
+        SetFocus(changelog_edit);
+        run_modal_loop(owner, &state);
         EnableWindow(owner, 1);
         DestroyWindow(hwnd);
     }
@@ -923,8 +939,7 @@ extern "system" fn modal_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
     }
 }
 
-unsafe fn run_modal_loop(owner: HWND, hwnd: HWND, state: &ModalState) {
-    SetFocus(hwnd);
+unsafe fn run_modal_loop(owner: HWND, state: &ModalState) {
     let mut msg: MSG = std::mem::zeroed();
     while !state.done.get() && GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
         if IsDialogMessageW(GetAncestor(msg.hwnd, GA_ROOT), &mut msg) == 0 {
@@ -1158,6 +1173,10 @@ fn html_to_text(value: &str) -> String {
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
         .join("\r\n")
+}
+
+fn windows_multiline_text(value: &str) -> String {
+    value.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "\r\n")
 }
 
 fn download_file(url: &str, target_path: &Path, tx: &Sender<WorkerMessage>, hwnd: isize) -> Result<()> {
@@ -1595,6 +1614,14 @@ mod tests {
         assert!(!should_install_russian_localization_entry(
             r"BepInEx\plugins\AccessTheObelisk\AccessTheObelisk.dll"
         ));
+    }
+
+    #[test]
+    fn changelog_newlines_are_normalized_for_multiline_edit_control() {
+        assert_eq!(
+            windows_multiline_text("First\nSecond\r\nThird\rFourth"),
+            "First\r\nSecond\r\nThird\r\nFourth"
+        );
     }
 
     #[test]
