@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -75,7 +77,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 CardScreenManager.Instance.ShowCardScreen(_state: false);
                 ScreenReader.Say(Loc.Get("deck_card_detail_closed"));
@@ -86,10 +88,10 @@ namespace AccessTheObelisk
 
         private bool TryOpenDeckHotkey()
         {
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool shift = ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
             bool vanishPile = ctrl && shift;
-            if ((!vanishPile && ctrl) || !Input.GetKeyDown(KeyCode.F) || TextInputFocusHelper.IsTextInputFocused())
+            if ((!vanishPile && ctrl) || !ModInput.GetKeyDown(KeyCode.F) || TextInputFocusHelper.IsTextInputFocused())
             {
                 return false;
             }
@@ -238,7 +240,7 @@ namespace AccessTheObelisk
 
             for (int i = 0; i < 4; i++)
             {
-                Hero hero = AtOManager.Instance.GetHero(i);
+                Hero hero = AtOManager.Instance.team.GetHero(i);
                 if (hero != null && hero.HeroData != null)
                 {
                     return i;
@@ -372,72 +374,72 @@ namespace AccessTheObelisk
 
         private static DeckItem BuildCardItem(CardItem card)
         {
-            CardData data = card.CardData;
+            CardRealtimeData data = card.CardData;
             DeckItem item = new DeckItem();
             item.Card = card;
-            item.Lines.AddRange(CardSpeech.BuildCardLines(data, card.GetEnergyCost()));
-            item.Summary = CardSpeech.BuildCardFocusSummary(data, card.GetEnergyCost());
+            item.Lines.AddRange(CardSpeech.BuildDetailLines(data, card.GetEnergyCost()));
+            item.Summary = CardSpeech.BuildDetailSummary(data, card.GetEnergyCost());
             return item;
         }
 
         private void ProcessKeys(CharacterWindowUI characterWindow, UIDeckCards combatDeckWindow)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 OpenFocusedCardDetail();
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 CloseDeck(characterWindow, combatDeckWindow);
             }

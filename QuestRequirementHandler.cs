@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -41,44 +41,44 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            bool shift = ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
             if (!ctrl || !shift)
             {
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 ChangeFilter(-1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 ChangeFilter(1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return true;

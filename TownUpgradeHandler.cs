@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -295,38 +295,38 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 ReadLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 ReadLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
@@ -334,40 +334,40 @@ namespace AccessTheObelisk
 
             if (_lastSellMode)
             {
-                if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
+                if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
                 {
                     MoveSellItem(-1);
                     return;
                 }
 
-                if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+                if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
                 {
                     MoveSellItem(1);
                     return;
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.UpArrow))
+            else if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveGroup(-1);
                 return;
             }
-            else if (Input.GetKeyDown(KeyCode.DownArrow))
+            else if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveGroup(1);
                 return;
             }
-            else if (Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1);
                 return;
             }
-            else if (Input.GetKeyDown(KeyCode.RightArrow))
+            else if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 Activate();
             }

@@ -89,6 +89,9 @@
         /// <summary>Hero perk tree is active.</summary>
         PerkTree,
 
+        /// <summary>Hero customization popup (stats, rank, skins, card backs) is active.</summary>
+        CharPopup,
+
         /// <summary>Map corruption reward choice is active.</summary>
         Corruption,
 
@@ -113,10 +116,16 @@
         /// <summary>Multiplayer lobby is active.</summary>
         Lobby,
 
+        /// <summary>Multiplayer players popup is active.</summary>
+        PlayersPopup,
+
         /// <summary>Multiplayer resource transfer window is active.</summary>
         Give,
 
         /// <summary>Cinematic scene is active.</summary>
-        Cinematic
+        Cinematic,
+
+        /// <summary>Credits screen is active.</summary>
+        Credits
     }
 }

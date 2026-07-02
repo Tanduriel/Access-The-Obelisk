@@ -1,10 +1,13 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
+using Cards.Data.Effects;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -256,11 +259,11 @@ namespace AccessTheObelisk
         {
             for (int i = 0; i < 4; i++)
             {
-                Hero hero = AtOManager.Instance != null ? AtOManager.Instance.GetHero(i) : null;
+                Hero hero = AtOManager.Instance != null ? AtOManager.Instance.team.GetHero(i) : null;
                 if (hero != null && hero.HeroData != null)
                 {
                     _heroes.Add(i);
-                    if (challenge.currentHeroIndex == i)
+                    if (ChallengeHeroIndex(challenge) == i)
                     {
                         _heroIndex = _heroes.Count - 1;
                     }
@@ -333,8 +336,8 @@ namespace AccessTheObelisk
         {
             string title = Clean(craft.cardChallengeGlobalTitle != null ? craft.cardChallengeGlobalTitle.text : "");
             string round = Clean(craft.cardChallengeRound != null ? craft.cardChallengeRound.text : "");
-            string hero = HeroName(challenge.currentHeroIndex);
-            string bonus = BuildDeckSummary(challenge.currentHeroIndex);
+            string hero = HeroName(ChallengeHeroIndex(challenge));
+            string bonus = BuildDeckSummary(ChallengeHeroIndex(challenge));
             List<string> parts = new List<string>();
             parts.Add(string.IsNullOrWhiteSpace(title) ? Loc.Get("challenge_screen") : title);
             if (!string.IsNullOrWhiteSpace(hero))
@@ -372,68 +375,68 @@ namespace AccessTheObelisk
                 _waitForSubmitRelease = false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false, challenge);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true, challenge);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveZone(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveZone(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1, challenge);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1, challenge);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(challenge);
             }
@@ -483,9 +486,9 @@ namespace AccessTheObelisk
                 }
 
                 int hero = CurrentHeroIndex();
-                if (hero >= 0 && hero != challenge.currentHeroIndex)
+                if (hero >= 0 && hero != ChallengeHeroIndex(challenge))
                 {
-                    AtOManager.Instance.SideBarCharacterClicked(hero);
+                    AtOManager.Instance.SideBarCharacterClicked(AtOManager.Instance.team.GetHero(hero));
                     _lastHeader = null;
                     _lastFocusKey = FocusKey();
                     return;
@@ -520,9 +523,9 @@ namespace AccessTheObelisk
                 }
 
                 int hero = CurrentHeroIndex();
-                if (hero >= 0 && hero != challenge.currentHeroIndex)
+                if (hero >= 0 && hero != ChallengeHeroIndex(challenge))
                 {
-                    AtOManager.Instance.SideBarCharacterClicked(hero);
+                    AtOManager.Instance.SideBarCharacterClicked(AtOManager.Instance.team.GetHero(hero));
                     _lastHeader = null;
                     _lastFocusKey = FocusKey();
                     return;
@@ -585,7 +588,7 @@ namespace AccessTheObelisk
                 int hero = CurrentHeroIndex();
                 if (hero >= 0)
                 {
-                    AtOManager.Instance.SideBarCharacterClicked(hero);
+                    AtOManager.Instance.SideBarCharacterClicked(AtOManager.Instance.team.GetHero(hero));
                     ScreenReader.Say(Loc.Get("challenge_current_hero", HeroName(hero)));
                 }
             }
@@ -618,7 +621,7 @@ namespace AccessTheObelisk
 
             if (item.Perk != null)
             {
-                challenge.AssignPerk(challenge.currentHeroIndex, item.PerkIndex);
+                challenge.AssignPerk(challenge.currentHero, item.PerkIndex);
                 ScreenReader.Say(Loc.Get("activated", item.Summary));
                 _lastHeader = null;
                 _lastFocusKey = null;
@@ -627,7 +630,7 @@ namespace AccessTheObelisk
 
             if (item.PackIndex >= 0)
             {
-                challenge.SelectPack(challenge.currentHeroIndex, item.PackIndex);
+                challenge.SelectPack(challenge.currentHero, item.PackIndex);
                 ScreenReader.Say(Loc.Get("activated", item.Summary));
                 _lastHeader = null;
                 _lastFocusKey = null;
@@ -820,25 +823,25 @@ namespace AccessTheObelisk
                 Functions.TransformIsVisible(transforms[index]);
         }
 
-        private static void AddCardLine(List<string> lines, CardData data)
+        private static void AddCardLine(List<string> lines, CardRealtimeData data)
         {
             if (data == null)
             {
                 return;
             }
 
-            lines.Add(CardSpeech.BuildCardFocusSummary(data, data.EnergyCost));
-            lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
+            lines.Add(CardSpeech.BuildDetailSummary(data, data.EnergyCost));
+            lines.AddRange(CardSpeech.BuildDetailLines(data, data.EnergyCost));
         }
 
-        private static void AddCardDetails(List<string> lines, CardData data)
+        private static void AddCardDetails(List<string> lines, CardRealtimeData data)
         {
             if (data == null)
             {
                 return;
             }
 
-            lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
+            lines.AddRange(CardSpeech.BuildDetailLines(data, data.EnergyCost));
         }
 
         private static void AddPerkDetailLines(List<string> lines, PerkData data)
@@ -1005,7 +1008,7 @@ namespace AccessTheObelisk
 
         private static string BuildDeckSummary(int heroIndex)
         {
-            Hero hero = AtOManager.Instance != null ? AtOManager.Instance.GetHero(heroIndex) : null;
+            Hero hero = AtOManager.Instance != null ? AtOManager.Instance.team.GetHero(heroIndex) : null;
             if (hero == null || hero.Cards == null)
             {
                 return string.Empty;
@@ -1015,36 +1018,23 @@ namespace AccessTheObelisk
             Dictionary<string, EffectCount> effects = new Dictionary<string, EffectCount>();
             for (int i = 0; i < hero.Cards.Count; i++)
             {
-                CardData card = Globals.Instance != null ? Globals.Instance.GetCardData(hero.Cards[i], instantiate: false) : null;
+                CardRealtimeData card = Globals.Instance != null ? Globals.Instance.GetCardData(hero.Cards[i], instantiate: false) : null;
                 if (card == null)
                 {
                     continue;
                 }
 
-                AddDamage(damage, card.DamageType);
-                AddDamage(damage, card.DamageType2);
-                if (card.EnergyRecharge > 0)
+                AddCardDamageTypes(damage, card);
+                if (card.EnergyRecharges != null && card.EnergyRecharges.Count > 0)
                 {
                     AddPseudoEffect(effects, "energy", GameText.SpriteName("energy"), 1);
                 }
 
-                if (card.Heal > 0)
+                if (card.Heal != null && card.Heal.HasHeal)
                 {
                     AddPseudoEffect(effects, "heal", GameText.SpriteName("heal"), 1);
                 }
 
-                AddEffect(effects, card.Aura);
-                AddEffect(effects, card.AuraSelf);
-                AddEffect(effects, card.Aura2);
-                AddEffect(effects, card.AuraSelf2);
-                AddEffect(effects, card.Aura3);
-                AddEffect(effects, card.AuraSelf3);
-                AddEffect(effects, card.Curse);
-                AddEffect(effects, card.CurseSelf);
-                AddEffect(effects, card.Curse2);
-                AddEffect(effects, card.CurseSelf2);
-                AddEffect(effects, card.Curse3);
-                AddEffect(effects, card.CurseSelf3);
                 AddEffectArray(effects, card.Auras);
                 AddEffectArray(effects, card.Curses);
             }
@@ -1081,6 +1071,43 @@ namespace AccessTheObelisk
             return string.Join(" ", parts.ToArray());
         }
 
+        /// <summary>
+        /// Resolves the board position of the hero currently selected on the challenge screen,
+        /// returning -1 when no hero is selected. Replaces the removed <c>currentHeroIndex</c> field.
+        /// </summary>
+        private static int ChallengeHeroIndex(ChallengeSelectionManager challenge)
+        {
+            Hero hero = challenge != null ? challenge.currentHero : null;
+            return hero != null && AtOManager.Instance != null
+                ? AtOManager.Instance.team.GetHeroPosition(hero)
+                : -1;
+        }
+
+        /// <summary>
+        /// Records each distinct damage type the card deals into the running damage summary.
+        /// </summary>
+        private static void AddCardDamageTypes(Dictionary<Enums.DamageType, int> damage, CardRealtimeData card)
+        {
+            if (card == null || card.DamageOriginal == null)
+            {
+                return;
+            }
+
+            HashSet<Enums.DamageType> seen = new HashSet<Enums.DamageType>();
+            foreach (DamageEffectData effect in card.DamageOriginal)
+            {
+                if (effect != null)
+                {
+                    seen.Add(effect.DamageType);
+                }
+            }
+
+            foreach (Enums.DamageType type in seen)
+            {
+                AddDamage(damage, type);
+            }
+        }
+
         private static void AddDamage(Dictionary<Enums.DamageType, int> damage, Enums.DamageType type)
         {
             if (type == Enums.DamageType.None)
@@ -1104,31 +1131,29 @@ namespace AccessTheObelisk
             AddPseudoEffect(effects, key, Clean(GameText.AuraCurseName(effect)), 1);
         }
 
-        private static void AddEffectArray(Dictionary<string, EffectCount> effects, CardData.AuraBuffs[] values)
+        private static void AddEffectArray(Dictionary<string, EffectCount> effects, AuraData values)
         {
-            if (values == null)
+            if (values == null || values.Auras == null)
             {
                 return;
             }
 
-            for (int i = 0; i < values.Length; i++)
+            foreach (AuraEffectData entry in values.Auras)
             {
-                AddEffect(effects, values[i].aura);
-                AddEffect(effects, values[i].auraSelf);
+                AddEffect(effects, entry.Aura);
             }
         }
 
-        private static void AddEffectArray(Dictionary<string, EffectCount> effects, CardData.CurseDebuffs[] values)
+        private static void AddEffectArray(Dictionary<string, EffectCount> effects, List<CurseEffectData> values)
         {
             if (values == null)
             {
                 return;
             }
 
-            for (int i = 0; i < values.Length; i++)
+            foreach (CurseEffectData entry in values)
             {
-                AddEffect(effects, values[i].curse);
-                AddEffect(effects, values[i].curseSelf);
+                AddEffect(effects, entry.Curse);
             }
         }
 
@@ -1178,7 +1203,7 @@ namespace AccessTheObelisk
 
         private static string HeroName(int index)
         {
-            Hero hero = AtOManager.Instance != null ? AtOManager.Instance.GetHero(index) : null;
+            Hero hero = AtOManager.Instance != null ? AtOManager.Instance.team.GetHero(index) : null;
             if (hero == null || hero.HeroData == null)
             {
                 return Loc.Get("unknown_hero");
@@ -1218,7 +1243,7 @@ namespace AccessTheObelisk
 
         private static bool IsSubmitHeld()
         {
-            return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter) || Input.GetKey(KeyCode.Space);
+            return ModInput.GetKey(KeyCode.Return) || ModInput.GetKey(KeyCode.KeypadEnter) || ModInput.GetKey(KeyCode.Space);
         }
 
         private static int ClampIndex(int index, int count)

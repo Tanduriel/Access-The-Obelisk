@@ -1,6 +1,6 @@
 param(
     [string]$Configuration = "Debug",
-    [string]$GamePath = "D:\Across.the.Obelisk.v1.7.5.1"
+    [string]$GamePath = "D:\SteamLibrary\steamapps\common\Across the Obelisk"
 )
 
 $ErrorActionPreference = "Stop"

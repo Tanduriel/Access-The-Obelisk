@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace AccessTheObelisk
 {
@@ -17,25 +17,25 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
             if (!ctrl)
             {
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.G))
+            if (ModInput.GetKeyDown(KeyCode.G))
             {
                 AnnounceGold();
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.D))
+            if (ModInput.GetKeyDown(KeyCode.D))
             {
                 AnnounceDust();
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.S))
+            if (ModInput.GetKeyDown(KeyCode.S))
             {
                 AnnounceSupply();
                 return true;
@@ -53,7 +53,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            ScreenReader.Say(Loc.Get("currency_gold", ato.GetPlayerGold()));
+            ScreenReader.Say(Loc.Get("currency_gold", ato.CurrencyManager.GetPlayerGold()));
         }
 
         private static void AnnounceDust()
@@ -65,7 +65,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            ScreenReader.Say(Loc.Get("currency_dust", ato.GetPlayerDust()));
+            ScreenReader.Say(Loc.Get("currency_dust", ato.CurrencyManager.GetPlayerDust()));
         }
 
         private static void AnnounceSupply()
@@ -90,8 +90,8 @@ namespace AccessTheObelisk
                 return;
             }
 
-            int gold = ato != null ? ato.GetPlayerGold() : 0;
-            int dust = ato != null ? ato.GetPlayerDust() : 0;
+            int gold = ato != null ? ato.CurrencyManager.GetPlayerGold() : 0;
+            int dust = ato != null ? ato.CurrencyManager.GetPlayerDust() : 0;
             int supply = player != null ? player.GetPlayerSupplyActual() : 0;
             ScreenReader.Say(Loc.Get("currency_all", gold, dust, supply));
         }

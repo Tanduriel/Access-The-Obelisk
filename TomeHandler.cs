@@ -1,9 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -14,7 +16,7 @@ namespace AccessTheObelisk
         private sealed class TomeItem
         {
             public string Summary;
-            public CardData Card;
+            public CardRealtimeData Card;
             public readonly List<string> Lines = new List<string>();
             public Action Activate;
         }
@@ -77,7 +79,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 CardScreenManager.Instance.ShowCardScreen(_state: false);
                 ScreenReader.Say(Loc.Get("tome_card_detail_closed"));
@@ -88,7 +90,8 @@ namespace AccessTheObelisk
 
         private bool TryOpenHotkey()
         {
-            if (!Input.GetKeyDown(KeyCode.B) || TextInputFocusHelper.IsTextInputFocused())
+            // Ignore B while Ctrl is held so combat Ctrl+B (block/shield) is not stolen.
+            if (!ModInput.GetKeyDown(KeyCode.B) || ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl) || TextInputFocusHelper.IsTextInputFocused())
             {
                 return false;
             }
@@ -532,7 +535,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static TomeItem BuildCardItem(CardData data, int energyCost)
+        private static TomeItem BuildCardItem(CardRealtimeData data, int energyCost)
         {
             TomeItem item = new TomeItem();
             item.Card = data;
@@ -558,50 +561,50 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(TomeManager tome, string section)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.F))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.F))
             {
                 FocusSearch(tome);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveSection(tome, -1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.RightArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveSection(tome, 1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 if (tome.IsTherePrev())
                 {
@@ -616,7 +619,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 if (tome.IsThereNext())
                 {
@@ -631,37 +634,37 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 ActivateFocused();
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 HandleEscape(tome, section);
             }
@@ -819,7 +822,7 @@ namespace AccessTheObelisk
 
         private static void HandleSearchFocus(TomeManager tome)
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 tome.searchInput.DeactivateInputField();
                 ScreenReader.Say(Loc.Get("tome_search_closed"));
@@ -1130,7 +1133,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKey(KeyCode.Escape))
+            if (ModInput.GetKey(KeyCode.Escape))
             {
                 return true;
             }

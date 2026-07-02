@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -181,18 +183,13 @@ namespace AccessTheObelisk
             return collider == null || collider.enabled;
         }
 
-        private static RewardItem BuildCardReward(int characterIndex, string internalId, CardData data)
+        private static RewardItem BuildCardReward(int characterIndex, string internalId, CardRealtimeData data)
         {
             RewardItem item = new RewardItem();
             item.CharacterIndex = characterIndex;
             item.InternalId = internalId;
-            item.Lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
-            if (data != null && data.CardType == Enums.CardType.Pet)
-            {
-                item.Lines.AddRange(CardSpeech.BuildItemEffectLines(data));
-            }
-
-            item.Summary = CardSpeech.BuildCardFocusSummary(data, data.EnergyCost);
+            item.Lines.AddRange(CardSpeech.BuildDetailLines(data, data.EnergyCost));
+            item.Summary = CardSpeech.BuildDetailSummary(data, data.EnergyCost);
             return item;
         }
 
@@ -230,68 +227,68 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(RewardsManager rewards)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveCharacter(-1, rewards);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveCharacter(1, rewards);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 Activate(rewards);
             }
@@ -453,6 +450,11 @@ namespace AccessTheObelisk
             }
 
             string text = item.Summary;
+            if (GameManager.Instance != null && GameManager.Instance.IsMultiplayer())
+            {
+                text = AddMultiplayerRewardContext(item, text);
+            }
+
             if (queued)
             {
                 ScreenReader.SayQueued(text);
@@ -461,6 +463,25 @@ namespace AccessTheObelisk
             {
                 ScreenReader.Say(text);
             }
+        }
+
+        private string AddMultiplayerRewardContext(RewardItem item, string text)
+        {
+            RewardsManager rewards = RewardsManager.Instance;
+            Hero hero = HeroForCharacter(item.CharacterIndex);
+            string heroName = hero != null ? Clean(hero.SourceName) : "";
+            if (string.IsNullOrWhiteSpace(heroName))
+            {
+                heroName = Loc.Get("unknown_hero");
+            }
+
+            string owner = RewardOwnerName(rewards, item.CharacterIndex);
+            if (CanChooseReward(rewards, item.CharacterIndex))
+            {
+                return Loc.Get("reward_focus_owner", text, heroName, owner);
+            }
+
+            return Loc.Get("reward_focus_read_only", text, heroName, owner);
         }
 
         private RewardItem CurrentItem()
@@ -493,7 +514,17 @@ namespace AccessTheObelisk
                 return null;
             }
 
-            return AtOManager.Instance.GetHero(characterIndex);
+            return HeroForCharacter(characterIndex);
+        }
+
+        private static Hero HeroForCharacter(int characterIndex)
+        {
+            if (characterIndex < 0 || AtOManager.Instance == null)
+            {
+                return null;
+            }
+
+            return AtOManager.Instance.team.GetHero(characterIndex);
         }
 
         private int CurrentLinesCount()

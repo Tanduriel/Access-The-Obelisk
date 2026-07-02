@@ -135,7 +135,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            Hero[] heroes = AtOManager.Instance.GetTeam();
+            Hero[] heroes = AtOManager.Instance.team.heroes.ToArray();
             if (heroes == null)
             {
                 return;
@@ -186,31 +186,31 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(ConflictManager conflict)
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(conflict);
             }

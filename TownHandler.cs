@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace AccessTheObelisk
@@ -197,31 +197,31 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 Activate();
             }

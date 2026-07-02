@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -25,6 +25,16 @@ namespace AccessTheObelisk
         private bool _queueNextFocusAnnouncement;
         private float _lastPollTime;
         private float _suppressFocusUntil;
+
+        /// <summary>
+        /// Forces the menu to re-announce the current focus on the next poll cycle.
+        /// </summary>
+        public void ForceReannounce()
+        {
+            _lastObject = null;
+            _lastAnnouncement = null;
+            _suppressFocusUntil = 0f;
+        }
 
         /// <summary>
         /// Updates main menu keyboard support and focus announcements.
@@ -101,6 +111,13 @@ namespace AccessTheObelisk
                 return;
             }
 
+            // DLCInformationT can briefly become active during initialization before settling.
+            // Only treat a DLCPopup transition as real if we actually came from the DLC list.
+            if (currentScreen == "DLCPopup" && _lastMenuScreen != "DLC")
+            {
+                return;
+            }
+
             _lastMenuScreen = currentScreen;
             _lastObject = null;
             _lastAnnouncement = null;
@@ -128,6 +145,20 @@ namespace AccessTheObelisk
                 _manualFocusIndex = 0;
                 SayScreen(Loc.Get("profile_screen"));
             }
+            else if (currentScreen == "DLC")
+            {
+                _pendingInitialFocusScreen = currentScreen;
+                _manualFocusScreen = currentScreen;
+                _manualFocusIndex = 0;
+                SayScreen(Loc.Get("dlc_screen"));
+            }
+            else if (currentScreen == "DLCPopup")
+            {
+                _pendingInitialFocusScreen = currentScreen;
+                _manualFocusScreen = currentScreen;
+                _manualFocusIndex = 0;
+                SayScreen(GetDlcPopupAnnouncement(menu));
+            }
             else if (currentScreen == "Main")
             {
                 _manualFocusScreen = currentScreen;
@@ -137,6 +168,16 @@ namespace AccessTheObelisk
 
         private static string GetMenuScreen(MainMenuManager menu)
         {
+            if (IsDLCPopupOpen(menu))
+            {
+                return "DLCPopup";
+            }
+
+            if (IsDLCListOpen(menu))
+            {
+                return "DLC";
+            }
+
             if (menu.IsGameModesActive())
             {
                 return "GameMode";
@@ -155,15 +196,90 @@ namespace AccessTheObelisk
             return "Main";
         }
 
+        private static bool IsDLCListOpen(MainMenuManager menu)
+        {
+            // The game shows the list via ShowHideDLCInformation(true): DLCT active, DLCInformationT
+            // inactive. The intro/default state keeps DLCInformationT active, so requiring it inactive
+            // excludes both the intro screen and the prefab's default state at main menu load.
+            return menu != null &&
+                menu.DLCT != null && menu.DLCT.gameObject.activeSelf &&
+                menu.DLCInformationT != null && !menu.DLCInformationT.gameObject.activeSelf &&
+                !IsDLCPopupOpen(menu);
+        }
+
+        private static bool IsDLCPopupOpen(MainMenuManager menu)
+        {
+            // The popup is a separate overlay object (DLCpopup), toggled by the game's
+            // DLCPopupShow/IsDLCPopupActive. This is the only reliable popup indicator.
+            return menu != null &&
+                   menu.DLCpopup != null && menu.DLCpopup.gameObject.activeSelf;
+        }
+
+        private static bool IsDlcLinkButton(GameObject current)
+        {
+            MainMenuManager menu = MainMenuManager.Instance;
+            return menu != null && IsWithinTransform(current, menu.DLCLinkButton);
+        }
+
+        private static bool IsDlcExitButton(GameObject current)
+        {
+            MainMenuManager menu = MainMenuManager.Instance;
+            return menu != null && IsWithinTransform(current, menu.DLCExitButton);
+        }
+
+        private static bool IsDlcListItem(MainMenuManager menu, GameObject current)
+        {
+            if (menu == null || menu.DLCT == null || current == null)
+            {
+                return false;
+            }
+
+            return current.transform.IsChildOf(menu.DLCT) && !IsDLCPopupOpen(menu);
+        }
+
+        private static int GetDlcButtonIndex(MainMenuManager menu, GameObject current)
+        {
+            if (menu == null || menu.DLCT == null || current == null)
+            {
+                return -1;
+            }
+
+            Button[] buttons = menu.DLCT.GetComponentsInChildren<Button>(false);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && (buttons[i].gameObject == current || current.transform.IsChildOf(buttons[i].transform)))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
         private bool IsMenuReady(MainMenuManager menu)
         {
             string screen = GetMenuScreen(menu);
-            if (screen == "GameMode" || screen == "Save" || screen == "Profiles" || screen == "Main")
+            if (screen == "DLC")
+            {
+                return IsDLCListOpen(menu);
+            }
+
+            if (screen == "DLCPopup")
+            {
+                return IsDLCPopupOpen(menu);
+            }
+
+            if (IsManualFocusScreen(screen))
             {
                 return BuildPrimaryControllerList(menu).Count > 0;
             }
 
             return FindFirstVisibleMenuTransform(menu) != null;
+        }
+
+        private static bool IsManualFocusScreen(string screen)
+        {
+            return screen == "GameMode" || screen == "Save" || screen == "Profiles" || screen == "Main" || screen == "DLC" || screen == "DLCPopup";
         }
 
         private void EnsureSubmenuFocus(MainMenuManager menu)
@@ -219,42 +335,42 @@ namespace AccessTheObelisk
         {
             bool handledMovement = false;
             _manualFocusAnnouncedThisFrame = false;
-            if (IsFocusedTextInput() && (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow) || UnityEngine.Input.GetKeyDown(KeyCode.RightArrow)))
+            if (IsFocusedTextInput() && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow) && TryAdjustPdxDropdown(menu, -1))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) && TryAdjustPdxDropdown(menu, -1))
             {
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow) && TryAdjustPdxDropdown(menu, 1))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) && TryAdjustPdxDropdown(menu, 1))
             {
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 handledMovement = JumpManualFocus(menu, false);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.End))
+            else if (ModInput.GetKeyDown(KeyCode.End))
             {
                 handledMovement = JumpManualFocus(menu, true);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            else if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 handledMovement = Move(menu, goingUp: true);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            else if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 handledMovement = Move(menu, goingDown: true);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 handledMovement = Move(menu, goingLeft: true);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
+            else if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 handledMovement = Move(menu, goingRight: true);
             }
@@ -271,7 +387,7 @@ namespace AccessTheObelisk
                 }
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ActivateCurrent();
             }
@@ -295,7 +411,7 @@ namespace AccessTheObelisk
 
         private bool MoveManualFocus(MainMenuManager menu, bool goingUp, bool goingRight, bool goingDown, bool goingLeft)
         {
-            if (_manualFocusScreen != "GameMode" && _manualFocusScreen != "Save" && _manualFocusScreen != "Profiles" && _manualFocusScreen != "Main")
+            if (!IsManualFocusScreen(_manualFocusScreen))
             {
                 return false;
             }
@@ -355,7 +471,7 @@ namespace AccessTheObelisk
 
         private bool JumpManualFocus(MainMenuManager menu, bool end)
         {
-            if (_manualFocusScreen != "GameMode" && _manualFocusScreen != "Save" && _manualFocusScreen != "Profiles" && _manualFocusScreen != "Main")
+            if (!IsManualFocusScreen(_manualFocusScreen))
             {
                 return false;
             }
@@ -538,6 +654,24 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (IsDlcLinkButton(current) && menu != null)
+            {
+                ScreenReader.Say(Loc.Get("activated", Loc.Get("dlc_link")));
+                menu.ButtonDLCPopupLink();
+                _lastObject = null;
+                _lastAnnouncement = null;
+                return;
+            }
+
+            if (IsDlcExitButton(current) && menu != null)
+            {
+                ScreenReader.Say(Loc.Get("activated", Loc.Get("dlc_close")));
+                menu.HideDLCPopup();
+                _lastObject = null;
+                _lastAnnouncement = null;
+                return;
+            }
+
             if (TryActivatePdxButton(menu, current, text))
             {
                 _lastObject = null;
@@ -574,6 +708,33 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (menu != null && IsWithinTransform(current, menu.joinT))
+            {
+                ScreenReader.Say(Loc.Get("activated", string.IsNullOrWhiteSpace(text) ? Loc.Get("main_menu_join_multiplayer") : text));
+                menu.JoinMultiplayer();
+                _lastObject = null;
+                _lastAnnouncement = null;
+                return;
+            }
+
+            if (IsDlcListItem(menu, current))
+            {
+                int dlcIndex = GetDlcButtonIndex(menu, current);
+                int skuCount = Globals.Instance != null && Globals.Instance.SkuAvailable != null ? Globals.Instance.SkuAvailable.Count : 0;
+                if (dlcIndex >= 0 && dlcIndex < skuCount)
+                {
+                    ScreenReader.Say(Loc.Get("activated", string.IsNullOrWhiteSpace(text) ? "button" : text));
+                    menu.ShowDLCPopup(dlcIndex);
+                    _lastObject = null;
+                    _lastAnnouncement = null;
+                    _queueNextFocusAnnouncement = true;
+                    return;
+                }
+
+                // Not a DLC tile (e.g. the list's Close/back button) — fall through to the
+                // generic Button handling below so its own onClick runs.
+            }
+
             Button button = current.GetComponentInParent<Button>();
             if (button != null && button.interactable)
             {
@@ -600,6 +761,13 @@ namespace AccessTheObelisk
 
             if (gameMode != null)
             {
+                string lockMessage = GetGameModeLockMessage(gameMode);
+                if (!string.IsNullOrWhiteSpace(lockMessage))
+                {
+                    ScreenReader.Say(Loc.Get("menu_item_unavailable", string.IsNullOrWhiteSpace(text) ? "game mode" : text) + ". " + lockMessage);
+                    return;
+                }
+
                 ScreenReader.Say(Loc.Get("activated", string.IsNullOrWhiteSpace(text) ? "game mode" : text));
                 gameMode.OnMouseUp();
                 _lastObject = null;
@@ -658,7 +826,7 @@ namespace AccessTheObelisk
 
         private GameObject GetManualFocusObject(MainMenuManager menu)
         {
-            if (_manualFocusScreen != "GameMode" && _manualFocusScreen != "Save" && _manualFocusScreen != "Profiles" && _manualFocusScreen != "Main")
+            if (!IsManualFocusScreen(_manualFocusScreen))
             {
                 return null;
             }
@@ -729,12 +897,140 @@ namespace AccessTheObelisk
             {
                 AddProfileSelections(candidates, menu);
             }
+            else if (IsDLCPopupOpen(menu))
+            {
+                AddDlcPopupSelections(candidates, menu);
+            }
+            else if (IsDLCListOpen(menu))
+            {
+                AddDlcListSelections(candidates, menu);
+            }
             else
             {
                 AddMainMenuSelections(candidates, menu);
             }
 
             return candidates;
+        }
+
+        private static void AddDlcListSelections(List<Transform> target, MainMenuManager menu)
+        {
+            if (menu.DLCT == null)
+            {
+                return;
+            }
+
+            Button[] buttons = menu.DLCT.GetComponentsInChildren<Button>(false);
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] == null)
+                {
+                    continue;
+                }
+
+                Transform t = buttons[i].transform;
+                if (Functions.TransformIsVisible(t) && !target.Contains(t))
+                {
+                    target.Add(t);
+                }
+            }
+        }
+
+        private static void AddDlcPopupSelections(List<Transform> target, MainMenuManager menu)
+        {
+            // Prefer the game's named popup buttons (link first, then exit) to match its own order.
+            if (menu.DLCLinkButton != null && !target.Contains(menu.DLCLinkButton))
+            {
+                target.Add(menu.DLCLinkButton);
+            }
+
+            if (menu.DLCExitButton != null && !target.Contains(menu.DLCExitButton))
+            {
+                target.Add(menu.DLCExitButton);
+            }
+
+            // The named fields may be unassigned in this build, so also gather every visible button
+            // inside the popup object itself.
+            if (menu.DLCpopup != null)
+            {
+                Button[] buttons = menu.DLCpopup.GetComponentsInChildren<Button>(false);
+                for (int i = 0; i < buttons.Length; i++)
+                {
+                    AddVisibleTransform(target, buttons[i] != null ? buttons[i].transform : null);
+                }
+            }
+        }
+
+        private static string GetDlcListButtonText(GameObject current)
+        {
+            MainMenuManager menu = MainMenuManager.Instance;
+            if (menu == null || menu.DLCT == null || current == null)
+            {
+                return string.Empty;
+            }
+
+            if (IsDLCPopupOpen(menu))
+            {
+                return string.Empty;
+            }
+
+            if (!current.transform.IsChildOf(menu.DLCT))
+            {
+                return string.Empty;
+            }
+
+            Button[] buttons = menu.DLCT.GetComponentsInChildren<Button>(false);
+            int index = -1;
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                if (buttons[i] != null && (buttons[i].gameObject == current || current.transform.IsChildOf(buttons[i].transform)))
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            if (index < 0 || Globals.Instance == null || Globals.Instance.SkuAvailable == null || index >= Globals.Instance.SkuAvailable.Count)
+            {
+                return string.Empty;
+            }
+
+            string sku = Globals.Instance.SkuAvailable[index];
+            string name = string.Empty;
+            try
+            {
+                name = SteamManager.Instance != null ? SteamManager.Instance.GetDLCName(sku) : string.Empty;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return string.Empty;
+            }
+
+            name = Clean(name);
+            bool owned = buttons[index].colors.normalColor.r > 0.5f;
+            return owned ? Loc.Get("dlc_item_owned", name) : Loc.Get("dlc_item_not_owned", name);
+        }
+
+        private static string GetDlcPopupAnnouncement(MainMenuManager menu)
+        {
+            string title = menu.DLCpopupTitle != null ? Clean(menu.DLCpopupTitle.text) : string.Empty;
+            string description = menu.DLCpopupDescription != null ? Clean(menu.DLCpopupDescription.text) : string.Empty;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return description;
+            }
+
+            if (string.IsNullOrWhiteSpace(description))
+            {
+                return title;
+            }
+
+            return title + ". " + description;
         }
 
         private static bool IsProfilesOpen(MainMenuManager menu)
@@ -769,6 +1065,7 @@ namespace AccessTheObelisk
             AddVisibleTransform(target, GetReadableChild(menu.gameModeSelection1));
             AddVisibleTransform(target, GetReadableChild(menu.gameModeSelection2));
             AddVisibleTransform(target, GetReadableChild(menu.gameModeSelection3));
+            AddVisibleTransform(target, GetReadableChild(menu.joinT));
         }
 
         private static Transform GetReadableChild(Transform parent)
@@ -792,6 +1089,7 @@ namespace AccessTheObelisk
                 }
             }
 
+            AddVisibleTransform(target, menu.DLCInformationT);
             AddPdxSelections(target, menu);
         }
 
@@ -928,6 +1226,22 @@ namespace AccessTheObelisk
 
         private static string GetReadableText(GameObject current)
         {
+            string dlcText = GetDlcListButtonText(current);
+            if (!string.IsNullOrWhiteSpace(dlcText))
+            {
+                return dlcText;
+            }
+
+            if (IsDlcLinkButton(current))
+            {
+                return Loc.Get("dlc_link");
+            }
+
+            if (IsDlcExitButton(current))
+            {
+                return Loc.Get("dlc_close");
+            }
+
             if (IsSaveDeleteAction(current))
             {
                 MenuSaveButton saveButtonDelete = current.GetComponentInParent<MenuSaveButton>();
@@ -944,7 +1258,14 @@ namespace AccessTheObelisk
             if (gameMode != null && gameMode.optionText != null)
             {
                 string title = Clean(gameMode.optionText.text);
-                return AppendDescription(title, GetGameModeDescription(gameMode));
+                string body = AppendDescription(title, GetGameModeDescription(gameMode));
+                string lockMessage = GetGameModeLockMessage(gameMode);
+                if (!string.IsNullOrWhiteSpace(lockMessage))
+                {
+                    return body + ". " + Loc.Get("locked") + ". " + lockMessage;
+                }
+
+                return body;
             }
 
             MenuSaveButton saveButton = current.GetComponentInParent<MenuSaveButton>();
@@ -1184,6 +1505,17 @@ namespace AccessTheObelisk
             return current != null && parent != null && current.transform.IsChildOf(parent);
         }
 
+        private static bool IsWithinTransform(GameObject current, Transform parent)
+        {
+            if (current == null || parent == null)
+            {
+                return false;
+            }
+
+            Transform transform = current.transform;
+            return transform == parent || transform.IsChildOf(parent) || parent.IsChildOf(transform);
+        }
+
         private static bool ContainsCreateAccountAction(string text)
         {
             return text.Contains("create") ||
@@ -1287,6 +1619,63 @@ namespace AccessTheObelisk
             }
 
             return string.IsNullOrWhiteSpace(text) ? "Delete save" : Clean(text);
+        }
+
+        private static string GetGameModeLockMessage(BotonMenuGameMode gameMode)
+        {
+            MainMenuManager menu = MainMenuManager.Instance;
+            if (menu == null || gameMode == null)
+            {
+                return string.Empty;
+            }
+
+            Transform chains;
+            switch (gameMode.gameMode)
+            {
+                case 2:
+                case 3:
+                    chains = menu.gameModeObeliskChains;
+                    break;
+                case 4:
+                case 5:
+                    chains = menu.gameModeWeeklyChains;
+                    break;
+                case 6:
+                case 7:
+                    chains = menu.gameModeSingularityChains;
+                    break;
+                default:
+                    chains = null;
+                    break;
+            }
+
+            if (chains == null || !chains.gameObject.activeInHierarchy)
+            {
+                return string.Empty;
+            }
+
+            // Prefer the game's own tooltip text attached to the lock overlay, if any.
+            PopupText popup = chains.GetComponentInChildren<PopupText>(true);
+            if (popup != null)
+            {
+                string text = string.Empty;
+                if (!string.IsNullOrWhiteSpace(popup.id) && Texts.Instance != null)
+                {
+                    text = Clean(Texts.Instance.GetText(popup.id));
+                }
+
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    text = Clean(popup.text);
+                }
+
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+
+            return Loc.Get("game_mode_locked");
         }
 
         private static string GetGameModeDescription(BotonMenuGameMode gameMode)

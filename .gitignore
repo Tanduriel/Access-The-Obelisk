@@ -3,9 +3,12 @@ obj/
 target/
 dist/
 decompiled/
+decompiled-new/
 save-backups/
 *.user
 *.suo
 *.log
 *.zip
 *.nupkg
+.claude/
+build_errors.txt

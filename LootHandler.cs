@@ -1,9 +1,11 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -105,8 +107,21 @@ namespace AccessTheObelisk
                 return;
             }
 
-            int restored = _characters.IndexOf(previousCharacter);
-            _characterListIndex = restored >= 0 ? restored : ClampIndex(_characterListIndex, _characters.Count);
+            if (GameManager.Instance != null && GameManager.Instance.IsMultiplayer())
+            {
+                int activeCharacter = GetActiveCharacter(loot);
+                int activeListIndex = _characters.IndexOf(activeCharacter);
+                if (activeListIndex >= 0)
+                {
+                    _characterListIndex = activeListIndex;
+                }
+            }
+            else
+            {
+                int restored = _characters.IndexOf(previousCharacter);
+                _characterListIndex = restored >= 0 ? restored : ClampIndex(_characterListIndex, _characters.Count);
+            }
+
             BuildItems(loot);
             _itemIndex = ClampIndex(_itemIndex, _items.Count);
             _bufferIndex = ClampIndex(_bufferIndex, CurrentBufferCount());
@@ -121,7 +136,7 @@ namespace AccessTheObelisk
                 foreach (Transform child in loot.cardContainer)
                 {
                     CardItem card = child != null ? child.GetComponent<CardItem>() : null;
-                    if (card == null || card.CardData == null || !card.gameObject.activeInHierarchy || IsCardDisabled(card))
+                    if (card == null || card.CardData == null || !card.gameObject.activeInHierarchy || ShouldSkipDisabledCard(loot, card))
                     {
                         continue;
                     }
@@ -141,14 +156,19 @@ namespace AccessTheObelisk
             }
         }
 
-        private static bool IsCardDisabled(CardItem card)
+        private static bool ShouldSkipDisabledCard(LootManager loot, CardItem card)
         {
-            return card.disableT != null && card.disableT.gameObject.activeInHierarchy;
+            if (card.disableT == null || !card.disableT.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            return CanChooseLoot(loot, GetActiveCharacter(loot));
         }
 
         private static LootItem BuildCardItem(CardItem card)
         {
-            CardData data = card.CardData;
+            CardRealtimeData data = card.CardData;
             if (data == null)
             {
                 return null;
@@ -180,7 +200,7 @@ namespace AccessTheObelisk
             return item;
         }
 
-        private static void AddItemOverviewBuffer(LootItem item, CardData data)
+        private static void AddItemOverviewBuffer(LootItem item, CardRealtimeData data)
         {
             LootBuffer buffer = new LootBuffer();
             buffer.Name = Loc.Get("item_overview");
@@ -189,7 +209,7 @@ namespace AccessTheObelisk
             item.Buffers.Add(buffer);
         }
 
-        private static void AddItemEffectBuffer(LootItem item, CardData data)
+        private static void AddItemEffectBuffer(LootItem item, CardRealtimeData data)
         {
             LootBuffer buffer = new LootBuffer();
             buffer.Name = Loc.Get("item_effects");
@@ -198,40 +218,6 @@ namespace AccessTheObelisk
             {
                 item.Buffers.Add(buffer);
             }
-        }
-
-        private static void AddItemDataLines(LootBuffer buffer, ItemData item)
-        {
-            if (item == null)
-            {
-                return;
-            }
-
-            AddItemNumberLine(buffer, "item_max_health", item.MaxHealth);
-            AddItemNumberLine(buffer, "item_energy", item.EnergyQuantity);
-            AddItemNumberLine(buffer, "item_draw_cards", item.DrawCards);
-            AddItemNumberLine(buffer, "item_heal", item.HealQuantity);
-            AddItemNumberLine(buffer, "item_heal_bonus", item.HealFlatBonus);
-            AddItemPercentLine(buffer, "item_heal_percent", item.HealPercentBonus);
-            AddItemDamageLine(buffer, item.DamageFlatBonus, item.DamageFlatBonusValue);
-            AddItemDamageLine(buffer, item.DamageFlatBonus2, item.DamageFlatBonusValue2);
-            AddItemDamageLine(buffer, item.DamageFlatBonus3, item.DamageFlatBonusValue3);
-            AddItemDamagePercentLine(buffer, item.DamagePercentBonus, item.DamagePercentBonusValue);
-            AddItemDamagePercentLine(buffer, item.DamagePercentBonus2, item.DamagePercentBonusValue2);
-            AddItemDamagePercentLine(buffer, item.DamagePercentBonus3, item.DamagePercentBonusValue3);
-            AddItemResistLine(buffer, item.ResistModified1, item.ResistModifiedValue1);
-            AddItemResistLine(buffer, item.ResistModified2, item.ResistModifiedValue2);
-            AddItemResistLine(buffer, item.ResistModified3, item.ResistModifiedValue3);
-            AddAuraLine(buffer, "item_aura_bonus", item.AuracurseBonus1, item.AuracurseBonusValue1);
-            AddAuraLine(buffer, "item_aura_bonus", item.AuracurseBonus2, item.AuracurseBonusValue2);
-            AddAuraLine(buffer, "item_aura_gain", item.AuracurseGain1, item.AuracurseGainValue1);
-            AddAuraLine(buffer, "item_aura_gain", item.AuracurseGain2, item.AuracurseGainValue2);
-            AddAuraLine(buffer, "item_aura_gain", item.AuracurseGain3, item.AuracurseGainValue3);
-            AddAuraLine(buffer, "item_self_aura_gain", item.AuracurseGainSelf1, item.AuracurseGainSelfValue1);
-            AddAuraLine(buffer, "item_self_aura_gain", item.AuracurseGainSelf2, item.AuracurseGainSelfValue2);
-            AddAuraLine(buffer, "item_self_aura_gain", item.AuracurseGainSelf3, item.AuracurseGainSelfValue3);
-            AddAuraNameLine(buffer, "item_aura_immunity", item.AuracurseImmune1);
-            AddAuraNameLine(buffer, "item_aura_immunity", item.AuracurseImmune2);
         }
 
         private void AnnounceOnce(LootManager loot)
@@ -252,80 +238,80 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(LootManager loot)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveBuffer(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.RightArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveBuffer(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveCharacter(-1, loot);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveCharacter(1, loot);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 Activate(loot);
             }
@@ -537,6 +523,11 @@ namespace AccessTheObelisk
             }
 
             string text = FocusSummary(item);
+            if (GameManager.Instance != null && GameManager.Instance.IsMultiplayer())
+            {
+                text = AddMultiplayerLootContext(text);
+            }
+
             if (queued)
             {
                 ScreenReader.SayQueued(text);
@@ -551,6 +542,31 @@ namespace AccessTheObelisk
         {
             LootBuffer buffer = CurrentBuffer();
             return buffer != null ? buffer.Summary : item.Summary;
+        }
+
+        private string AddMultiplayerLootContext(string text)
+        {
+            LootManager loot = LootManager.Instance;
+            int activeCharacter = GetActiveCharacter(loot);
+            if (activeCharacter < 0)
+            {
+                return text;
+            }
+
+            Hero hero = HeroForLootCharacter(loot, activeCharacter);
+            string heroName = hero != null ? Clean(hero.SourceName) : "";
+            if (string.IsNullOrWhiteSpace(heroName))
+            {
+                heroName = Loc.Get("unknown_hero");
+            }
+
+            string owner = LootOwnerName(loot, activeCharacter);
+            if (CanChooseLoot(loot, activeCharacter))
+            {
+                return Loc.Get("loot_focus_current_choice", text, heroName, owner);
+            }
+
+            return Loc.Get("loot_focus_read_only", text, heroName, owner);
         }
 
         private LootItem CurrentItem()
@@ -607,8 +623,18 @@ namespace AccessTheObelisk
                 return null;
             }
 
-            int heroIndex = LootHeroIndex(LootManager.Instance, index);
-            return heroIndex >= 0 ? AtOManager.Instance.GetHero(heroIndex) : null;
+            return HeroForLootCharacter(LootManager.Instance, index);
+        }
+
+        private static Hero HeroForLootCharacter(LootManager loot, int characterIndex)
+        {
+            if (AtOManager.Instance == null)
+            {
+                return null;
+            }
+
+            int heroIndex = LootHeroIndex(loot, characterIndex);
+            return heroIndex >= 0 ? AtOManager.Instance.team.GetHero(heroIndex) : null;
         }
 
         private static bool CanChooseLoot(LootManager loot, int characterIndex)
@@ -660,7 +686,7 @@ namespace AccessTheObelisk
                 return "";
             }
 
-            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            Hero hero = AtOManager.Instance.team.GetHero(heroIndex);
             return hero != null ? hero.Owner : "";
         }
 
@@ -688,62 +714,6 @@ namespace AccessTheObelisk
             }
 
             return characterIndex <= 3 ? characterIndex : -1;
-        }
-
-        private static void AddItemNumberLine(LootBuffer buffer, string key, int value)
-        {
-            if (value != 0)
-            {
-                AddLine(buffer, Loc.Get(key, value));
-            }
-        }
-
-        private static void AddItemPercentLine(LootBuffer buffer, string key, float value)
-        {
-            if (value != 0f)
-            {
-                AddLine(buffer, Loc.Get(key, value));
-            }
-        }
-
-        private static void AddItemDamageLine(LootBuffer buffer, Enums.DamageType damageType, int value)
-        {
-            if (damageType != Enums.DamageType.None && value != 0)
-            {
-                AddLine(buffer, Loc.Get("item_damage_bonus", GameText.DamageTypeName(damageType), value));
-            }
-        }
-
-        private static void AddItemDamagePercentLine(LootBuffer buffer, Enums.DamageType damageType, float value)
-        {
-            if (damageType != Enums.DamageType.None && value != 0f)
-            {
-                AddLine(buffer, Loc.Get("item_damage_percent", GameText.DamageTypeName(damageType), value));
-            }
-        }
-
-        private static void AddItemResistLine(LootBuffer buffer, Enums.DamageType damageType, int value)
-        {
-            if (damageType != Enums.DamageType.None && value != 0)
-            {
-                AddLine(buffer, Loc.Get("item_resist", GameText.DamageTypeName(damageType), value));
-            }
-        }
-
-        private static void AddAuraLine(LootBuffer buffer, string key, AuraCurseData aura, int value)
-        {
-            if (aura != null && value != 0)
-            {
-                AddLine(buffer, Loc.Get(key, Clean(GameText.AuraCurseName(aura)), value));
-            }
-        }
-
-        private static void AddAuraNameLine(LootBuffer buffer, string key, AuraCurseData aura)
-        {
-            if (aura != null)
-            {
-                AddLine(buffer, Loc.Get(key, Clean(GameText.AuraCurseName(aura))));
-            }
         }
 
         private static void AddLine(LootBuffer buffer, string line)

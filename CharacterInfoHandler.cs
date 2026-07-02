@@ -1,9 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using HarmonyLib;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -77,7 +79,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 CardScreenManager.Instance.ShowCardScreen(_state: false);
                 ScreenReader.Say(Loc.Get("character_card_detail_closed"));
@@ -88,8 +90,8 @@ namespace AccessTheObelisk
 
         private bool TryOpenHotkey()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl || !Input.GetKeyDown(KeyCode.I) || TextInputFocusHelper.IsTextInputFocused())
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl || !ModInput.GetKeyDown(KeyCode.I) || TextInputFocusHelper.IsTextInputFocused())
             {
                 return false;
             }
@@ -213,9 +215,9 @@ namespace AccessTheObelisk
                 return window.heroIndex;
             }
 
-            if (CardCraftManager.Instance != null && IsHeroAvailable(CardCraftManager.Instance.heroIndex))
+            if (CardCraftManager.Instance != null && IsHeroAvailable(AtOManager.Instance.team.GetHeroPosition(CardCraftManager.Instance.CurrentHero)))
             {
-                return CardCraftManager.Instance.heroIndex;
+                return AtOManager.Instance.team.GetHeroPosition(CardCraftManager.Instance.CurrentHero);
             }
 
             return FirstAvailableHeroIndex();
@@ -241,7 +243,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            Hero hero = AtOManager.Instance.GetHero(index);
+            Hero hero = AtOManager.Instance.team.GetHero(index);
             return hero != null && hero.HeroData != null;
         }
 
@@ -576,8 +578,8 @@ namespace AccessTheObelisk
                 AddLine(item, description);
             }
 
-            AddTraitCardLines(item, data.TraitCard, level, Loc.Get("character_trait_adds_card"));
-            AddTraitCardLines(item, data.TraitCardForAllHeroes, 0, Loc.Get("character_trait_adds_card_all"));
+            AddTraitCardLines(item, CardSpeech.Resolve(data.TraitCard), level, Loc.Get("character_trait_adds_card"));
+            AddTraitCardLines(item, CardSpeech.Resolve(data.TraitCardForAllHeroes), 0, Loc.Get("character_trait_adds_card_all"));
             if (string.IsNullOrWhiteSpace(description) && data.TraitCard == null && data.TraitCardForAllHeroes == null)
             {
                 AddLine(item, Loc.Get("character_trait_no_description"));
@@ -621,7 +623,7 @@ namespace AccessTheObelisk
 
         private static InfoItem BuildCardItem(CardItem card)
         {
-            CardData data = card.CardData;
+            CardRealtimeData data = card.CardData;
             InfoItem item = new InfoItem();
             item.Card = card;
             if (data != null && data.CardClass == Enums.CardClass.Item)
@@ -646,86 +648,86 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(CharacterWindowUI window, string tab)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveHero(window, -1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.RightArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveHero(window, 1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveTab(window, tab, -1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveTab(window, tab, 1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 ActivateFocused(window);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 window.Hide();
                 ScreenReader.Say(Loc.Get("character_window_closed"));
@@ -927,14 +929,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (!GameManager.Instance.IsMultiplayer())
-            {
-                AtOManager.Instance.HeroLevelUp(heroIndex, item.TraitData.Id);
-            }
-            else
-            {
-                AtOManager.Instance.HeroLevelUpMP(heroIndex, item.TraitData.Id);
-            }
+            AtOManager.Instance.HeroLevelUpMP(heroIndex, item.TraitData.Id);
 
             _lastRefreshTime = 0f;
         }
@@ -976,9 +971,9 @@ namespace AccessTheObelisk
             return window != null && window.npcButtons != null && window.npcButtons.gameObject.activeSelf;
         }
 
-        private static void AddTraitCardLines(InfoItem item, CardData card, int traitLevel, string label)
+        private static void AddTraitCardLines(InfoItem item, CardRealtimeData card, int traitLevel, string label)
         {
-            CardData data = TraitCardAtLevel(card, traitLevel);
+            CardRealtimeData data = TraitCardAtLevel(card, traitLevel);
             if (data == null)
             {
                 return;
@@ -992,7 +987,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static CardData TraitCardAtLevel(CardData card, int traitLevel)
+        private static CardRealtimeData TraitCardAtLevel(CardRealtimeData card, int traitLevel)
         {
             if (card == null || Globals.Instance == null)
             {
@@ -1071,7 +1066,7 @@ namespace AccessTheObelisk
                 return null;
             }
 
-            return AtOManager.Instance.GetHero(window.heroIndex);
+            return AtOManager.Instance.team.GetHero(window.heroIndex);
         }
 
         private static bool CanLevelUpHero(int heroIndex)
@@ -1086,7 +1081,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            Hero hero = AtOManager.Instance.team.GetHero(heroIndex);
             if (hero == null || string.IsNullOrWhiteSpace(hero.Owner))
             {
                 return false;
@@ -1102,7 +1097,7 @@ namespace AccessTheObelisk
                 return Loc.Get("unknown_player");
             }
 
-            Hero hero = AtOManager.Instance.GetHero(heroIndex);
+            Hero hero = AtOManager.Instance.team.GetHero(heroIndex);
             string owner = hero != null ? hero.Owner : "";
             if (string.IsNullOrWhiteSpace(owner))
             {

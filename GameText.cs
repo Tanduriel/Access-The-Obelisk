@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -56,7 +58,7 @@ namespace AccessTheObelisk
         /// <summary>
         /// Gets a localized card or item name.
         /// </summary>
-        public static string CardName(CardData card)
+        public static string CardName(CardRealtimeData card)
         {
             if (card == null)
             {
@@ -75,6 +77,34 @@ namespace AccessTheObelisk
         public static string CardRarityName(Enums.CardRarity rarity)
         {
             return LocalizedEnum("card_rarity_", rarity.ToString());
+        }
+
+        /// <summary>
+        /// Gets a localized trait name.
+        /// </summary>
+        public static string TraitName(TraitData trait)
+        {
+            if (trait == null)
+            {
+                return string.Empty;
+            }
+
+            string name = Get(trait.Id, "traits");
+            return string.IsNullOrWhiteSpace(name) ? trait.TraitName : name;
+        }
+
+        /// <summary>
+        /// Gets a localized trait description.
+        /// </summary>
+        public static string TraitDescription(TraitData trait)
+        {
+            if (trait == null)
+            {
+                return string.Empty;
+            }
+
+            string description = Get(trait.Id + "_description", "traits");
+            return string.IsNullOrWhiteSpace(description) ? trait.Description : description;
         }
 
         /// <summary>

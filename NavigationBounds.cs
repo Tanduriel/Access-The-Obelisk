@@ -12,7 +12,7 @@
             if (count == 1)
             {
                 index = 0;
-                return true;
+                return ModSettings.RepeatSingleItemEnabled;
             }
 
             int next = ClampIndex(index + delta, count);
@@ -35,7 +35,7 @@
             if (count == 1)
             {
                 index = 0;
-                return true;
+                return ModSettings.RepeatSingleItemEnabled;
             }
 
             int next = end ? count - 1 : 0;

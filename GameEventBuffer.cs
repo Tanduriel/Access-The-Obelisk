@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace AccessTheObelisk
@@ -60,7 +60,7 @@ namespace AccessTheObelisk
         /// </summary>
         public static bool Update()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
             if (IsHeroSelectionActive())
             {
                 if (!ctrl || !_focused)
@@ -68,25 +68,25 @@ namespace AccessTheObelisk
                     return false;
                 }
 
-                if (Input.GetKeyDown(KeyCode.UpArrow))
+                if (ModInput.GetKeyDown(KeyCode.UpArrow))
                 {
                     Move(1);
                     return true;
                 }
 
-                if (Input.GetKeyDown(KeyCode.DownArrow))
+                if (ModInput.GetKeyDown(KeyCode.DownArrow))
                 {
                     Move(-1);
                     return true;
                 }
 
-                if (Input.GetKeyDown(KeyCode.Home))
+                if (ModInput.GetKeyDown(KeyCode.Home))
                 {
                     Jump(false);
                     return true;
                 }
 
-                if (Input.GetKeyDown(KeyCode.End))
+                if (ModInput.GetKeyDown(KeyCode.End))
                 {
                     Jump(true);
                     return true;
@@ -97,7 +97,9 @@ namespace AccessTheObelisk
 
             if (!ctrl || IsMapActive() || IsLocalControlBufferActive())
             {
-                if (IsMapActive() || IsLocalControlBufferActive())
+                // Local-control handlers (combat, tome, ...) own buffer focus themselves,
+                // so only drop focus on the map, where nothing manages the buffer.
+                if (IsMapActive())
                 {
                     LeaveFocus(false);
                 }
@@ -105,7 +107,7 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 ToggleFocus();
                 return true;
@@ -116,25 +118,25 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(-1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return true;
@@ -146,10 +148,13 @@ namespace AccessTheObelisk
         private static bool IsLocalControlBufferActive()
         {
             CardCraftManager craft = CardCraftManager.Instance;
+            GiveManager give = GiveManager.Instance;
             return AccessStateManager.CurrentState == AccessState.Combat
                 || AccessStateManager.CurrentState == AccessState.CharacterInfo
+                || AccessStateManager.CurrentState == AccessState.Give
                 || AccessStateManager.CurrentState == AccessState.HeroSelection
                 || AccessStateManager.CurrentState == AccessState.Tome
+                || (give != null && give.IsActive())
                 || (craft != null
                 && craft.gameObject.activeInHierarchy
                 && (craft.craftType == 0 || craft.craftType == 4 || craft.craftType == 5));

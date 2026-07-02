@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
 using UnityEngine;
@@ -334,43 +334,43 @@ namespace AccessTheObelisk
                 _waitForSubmitRelease = false;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 AdjustFocused(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 AdjustFocused(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 ActivateFocused(madnessActive);
             }
@@ -501,7 +501,7 @@ namespace AccessTheObelisk
             }
 
             int nextPosition = Mathf.Clamp(position + delta, 0, values.Count - 1);
-            if (nextPosition == position && values.Count > 1)
+            if (nextPosition == position && (values.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -649,7 +649,7 @@ namespace AccessTheObelisk
 
         private static bool IsSubmitHeld()
         {
-            return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter) || Input.GetKey(KeyCode.Space);
+            return ModInput.GetKey(KeyCode.Return) || ModInput.GetKey(KeyCode.KeypadEnter) || ModInput.GetKey(KeyCode.Space);
         }
 
         internal static void NotifyShowMadness()

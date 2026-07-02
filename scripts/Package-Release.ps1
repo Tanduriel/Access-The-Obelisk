@@ -3,7 +3,7 @@ param(
     [string]$Version = "0.4",
     [string]$OutputDirectory = "",
     [string]$RussianLocalizationZip = "C:\Users\Incognitus\Downloads\AcrossTheObelisk_Russian_v1.2.1.zip",
-    [string]$ReleaseDocsDirectory = "D:\Access_the_Obelisk_V_0.3.5-Fix2\docs"
+    [string]$ReleaseDocsDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +15,9 @@ $OutputEncoding = $utf8NoBom
 $projectRoot = Split-Path -Parent $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $projectRoot "dist"
+}
+if ([string]::IsNullOrWhiteSpace($ReleaseDocsDirectory)) {
+    $ReleaseDocsDirectory = Join-Path $projectRoot "docs"
 }
 
 & "$PSScriptRoot\Build-Mod.ps1" -Configuration $Configuration
@@ -61,7 +64,19 @@ Copy-Item -LiteralPath (Join-Path $projectRoot "Localization\ru.txt") -Destinati
 Copy-Item -LiteralPath (Join-Path $projectRoot "third_party\prism\v0.16.5\windows-x64\prism.dll") -Destination $stageRoot -Force
 
 if (Test-Path -LiteralPath $ReleaseDocsDirectory) {
-    Copy-Item -LiteralPath $ReleaseDocsDirectory -Destination $stageRoot -Recurse -Force
+    # Only the player-facing En/Ru subfolders (readme.txt, changelog.txt) ship in the
+    # release package. Internal dev docs (game-api.md, release-guide.md) stay out.
+    $docsStageRoot = Join-Path $stageRoot "docs"
+    New-Item -ItemType Directory -Force -Path $docsStageRoot | Out-Null
+    foreach ($locale in @("En", "Ru")) {
+        $localeSource = Join-Path $ReleaseDocsDirectory $locale
+        if (Test-Path -LiteralPath $localeSource) {
+            Copy-Item -LiteralPath $localeSource -Destination $docsStageRoot -Recurse -Force
+        } else {
+            Write-Error "Release docs locale directory not found: $localeSource"
+            exit 1
+        }
+    }
 } else {
     Write-Error "Release docs directory not found: $ReleaseDocsDirectory"
     exit 1

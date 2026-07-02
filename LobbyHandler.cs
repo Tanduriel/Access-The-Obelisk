@@ -116,6 +116,7 @@ namespace AccessTheObelisk
         {
             _items.Clear();
             AddStatus(lobby);
+            AddSpecialButton("disconnect-region", lobby.regionsDisconnect, Loc.Get("lobby_disconnect_region"));
 
             if (IsVisible(lobby.regions))
             {
@@ -439,7 +440,7 @@ namespace AccessTheObelisk
         private void ProcessKeys(LobbyManager lobby)
         {
             bool textFocused = TextInputFocusHelper.IsTextInputFocused();
-            if (textFocused && !Input.GetKeyDown(KeyCode.UpArrow) && !Input.GetKeyDown(KeyCode.DownArrow))
+            if (textFocused && !ModInput.GetKeyDown(KeyCode.UpArrow) && !ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 return;
             }
@@ -449,34 +450,34 @@ namespace AccessTheObelisk
                 DeactivateFocusedInput();
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) && AdjustCurrent(-1))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) && AdjustCurrent(-1))
             {
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow) && AdjustCurrent(1))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) && AdjustCurrent(1))
             {
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 MoveToEdge(false);
             }
-            else if (Input.GetKeyDown(KeyCode.End))
+            else if (ModInput.GetKeyDown(KeyCode.End))
             {
                 MoveToEdge(true);
             }
-            else if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 Move(-1);
             }
-            else if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            else if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 Move(1);
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 ActivateCurrent(lobby);
             }

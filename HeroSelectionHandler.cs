@@ -1,7 +1,9 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -66,6 +68,12 @@ namespace AccessTheObelisk
             }
 
             if (AlertManager.Instance != null && AlertManager.Instance.IsActive())
+            {
+                return;
+            }
+
+            // The customization popup overlays this screen and is driven by CharPopupHandler.
+            if (manager.charPopup != null && manager.charPopup.IsOpened())
             {
                 return;
             }
@@ -318,106 +326,118 @@ namespace AccessTheObelisk
                 _waitForSubmitRelease = false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            bool shift = ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
             if (shift && _zone == SelectionZone.Actions && IsCurrentMadnessAction(manager) &&
-                (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
+                (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
-                AdjustMadnessFromHeroSelection(manager, Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
+                AdjustMadnessFromHeroSelection(manager, ModInput.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
                 return;
             }
 
-            if (shift && _zone == SelectionZone.Party && (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
+            if (shift && _zone == SelectionZone.Party && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
-                AdjustPartySlotOwner(manager, Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
+                AdjustPartySlotOwner(manager, ModInput.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
                 return;
             }
 
-            if (ctrl && GameEventBuffer.IsFocused && (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow)))
+            if (ctrl && GameEventBuffer.IsFocused && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
-                LeaveEventBufferToHeroDetails(manager, Input.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
+                LeaveEventBufferToHeroDetails(manager, ModInput.GetKeyDown(KeyCode.LeftArrow) ? -1 : 1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveDetailBuffer(manager, -1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.RightArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveDetailBuffer(manager, 1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 ReadDetailLine(manager, 1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 ReadDetailLine(manager, -1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpDetailLine(manager, false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpDetailLine(manager, true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveZone(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveZone(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (ctrl && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && (_zone == SelectionZone.Heroes || _zone == SelectionZone.Party))
+            if (ctrl && (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter)) && (_zone == SelectionZone.Heroes || _zone == SelectionZone.Party))
             {
-                OpenFocusedHeroPerks(manager);
+                OpenCharPopup(manager, "stats");
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.S) && (_zone == SelectionZone.Heroes || _zone == SelectionZone.Party))
+            {
+                OpenCharPopup(manager, "skins");
+                return;
+            }
+
+            if (ctrl && ModInput.GetKeyDown(KeyCode.B) && (_zone == SelectionZone.Heroes || _zone == SelectionZone.Party))
+            {
+                OpenCharPopup(manager, "cardbacks");
+                return;
+            }
+
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(manager);
             }
@@ -645,7 +665,7 @@ namespace AccessTheObelisk
             AnnounceFocused(true);
         }
 
-        private void OpenFocusedHeroPerks(HeroSelectionManager manager)
+        private void OpenCharPopup(HeroSelectionManager manager, string tab)
         {
             HeroSelection hero = _zone == SelectionZone.Party ? CurrentPartySlotHero(manager) : CurrentHero();
             if (hero == null)
@@ -654,14 +674,35 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (hero.blocked || hero.DlcBlocked)
+            SubClassData data = GetHeroSubClassData(hero);
+            CharPopup popup = manager.charPopup;
+            if (data == null || popup == null)
             {
-                ScreenReader.Say(Loc.Get("menu_item_unavailable", GetHeroText(hero)));
+                ScreenReader.Say(Loc.Get("hero_selection_no_details"));
                 return;
             }
 
-            ScreenReader.Say(Loc.Get("hero_selection_open_perks", GetHeroText(hero)));
-            PerkTree.Instance.Show(hero.Id);
+            popup.Init(data);
+            popup.Show();
+            string opened = Loc.Get("hero_selection_open_character", GetHeroText(hero));
+
+            if (tab == "skins")
+            {
+                popup.ShowSkins();
+            }
+            else if (tab == "cardbacks")
+            {
+                if (hero.blocked || hero.DlcBlocked)
+                {
+                    ScreenReader.Say(opened);
+                    ScreenReader.SayQueued(Loc.Get("char_popup_tab_cardbacks_unavailable"));
+                    return;
+                }
+
+                popup.ShowCardbacks();
+            }
+
+            ScreenReader.Say(opened);
         }
 
         private BoxSelection CurrentPartySlot()
@@ -752,7 +793,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (_detailLineIndex == previous && buffer.Lines.Count > 1)
+            if (_detailLineIndex == previous && (buffer.Lines.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -876,7 +917,7 @@ namespace AccessTheObelisk
         private void AddCardsBuffer(SubClassData data)
         {
             DetailBuffer buffer = NewBuffer(Loc.Get("hero_selection_buffer_cards"));
-            CardData item = StartingItem(data);
+            CardRealtimeData item = StartingItem(data);
             if (item != null)
             {
                 AddCleanPart(buffer.Lines, Loc.Get("hero_selection_starting_item", CardSpeech.BuildItemFocusSummary(item)));
@@ -895,7 +936,7 @@ namespace AccessTheObelisk
                         continue;
                     }
 
-                    CardData card = StartingCard(heroCard.Card, tier);
+                    CardRealtimeData card = StartingCard(CardSpeech.Resolve(heroCard.Card), tier);
                     int energy = card != null ? card.EnergyCost : 0;
                     AddCleanPart(buffer.Lines, Loc.Get("hero_selection_starting_card", heroCard.UnitsInDeck, CardSpeech.BuildCardFocusSummary(card, energy)));
                     AddLines(buffer.Lines, CardSpeech.BuildCardLines(card, energy));
@@ -1168,26 +1209,26 @@ namespace AccessTheObelisk
             {
                 manager.NgValue = value;
                 manager.NgValueMaster = value;
-                SaveManager.SaveIntoPrefsInt("madnessLevel", value);
-                SaveManager.SaveIntoPrefsString("madnessCorruptors", manager.NgCorruptors);
+                SaveManager.Instance.SaveIntoPrefsInt("madnessLevel", value);
+                SaveManager.Instance.SaveIntoPrefsString("madnessCorruptors", manager.NgCorruptors);
                 manager.SetMadnessLevel();
             }
             else if (GameManager.Instance.IsSingularity())
             {
                 manager.SingularityMadnessValue = value;
                 manager.SingularityMadnessValueMaster = value;
-                SaveManager.SaveIntoPrefsInt("singularityMadness", value);
+                SaveManager.Instance.SaveIntoPrefsInt("singularityMadness", value);
                 manager.SetSingularityMadnessLevel();
             }
             else
             {
                 manager.ObeliskMadnessValue = value;
                 manager.ObeliskMadnessValueMaster = value;
-                SaveManager.SaveIntoPrefsInt("obeliskMadness", value);
+                SaveManager.Instance.SaveIntoPrefsInt("obeliskMadness", value);
                 manager.SetObeliskMadnessLevel();
             }
 
-            SaveManager.SavePrefs();
+            SaveManager.Instance.SavePrefs();
         }
 
         private static string BuildMadnessSummary(int value)
@@ -1255,8 +1296,18 @@ namespace AccessTheObelisk
                 return;
             }
 
-            string name = Clean(trait.TraitName);
-            string description = Clean(trait.Description);
+            string name = Clean(GameText.TraitName(trait));
+            string description = Clean(GameText.TraitDescription(trait));
+            if (string.IsNullOrWhiteSpace(description) && trait.TraitCard != null)
+            {
+                CardRealtimeData card = Globals.Instance != null ? Globals.Instance.GetCardData(trait.TraitCard.Id, instantiate: false) : null;
+                string cardName = card != null ? Clean(GameText.CardName(card)) : "";
+                if (!string.IsNullOrWhiteSpace(cardName) && Texts.Instance != null)
+                {
+                    description = Clean(string.Format(Texts.Instance.GetText("traitAddCard"), cardName));
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(description))
             {
                 AddCleanPart(lines, name);
@@ -1266,9 +1317,9 @@ namespace AccessTheObelisk
             AddCleanPart(lines, Loc.Get("hero_selection_trait_line", name, description));
         }
 
-        private static CardData StartingCard(CardData card, int tier)
+        private static CardRealtimeData StartingCard(CardRealtimeData card, int tier)
         {
-            if (card == null || !card.Starter || Globals.Instance == null)
+            if (card == null || !card.HasFlag(CustomFlags.Starter) || Globals.Instance == null)
             {
                 return card;
             }
@@ -1286,25 +1337,25 @@ namespace AccessTheObelisk
             return card;
         }
 
-        private static CardData StartingItem(SubClassData data)
+        private static CardRealtimeData StartingItem(SubClassData data)
         {
             if (data == null || data.Item == null || Globals.Instance == null)
             {
-                return data != null ? data.Item : null;
+                return null;
             }
 
             string id = data.Item.Id;
             int tier = PlayerManager.Instance != null ? PlayerManager.Instance.GetCharacterTier(data.Id, "item") : 0;
-            if (tier == 1 && !string.IsNullOrWhiteSpace(data.Item.UpgradesTo1))
+            if (tier == 1 && !string.IsNullOrWhiteSpace(data.Item.Upgrade.UpgradesTo1))
             {
-                id = data.Item.UpgradesTo1;
+                id = data.Item.Upgrade.UpgradesTo1;
             }
-            else if (tier == 2 && !string.IsNullOrWhiteSpace(data.Item.UpgradesTo2))
+            else if (tier == 2 && !string.IsNullOrWhiteSpace(data.Item.Upgrade.UpgradesTo2))
             {
-                id = data.Item.UpgradesTo2;
+                id = data.Item.Upgrade.UpgradesTo2;
             }
 
-            return Globals.Instance.GetCardData(id, instantiate: false) ?? data.Item;
+            return Globals.Instance.GetCardData(id, instantiate: false);
         }
 
         private static int AdjustedHealth(SubClassData data)
@@ -1392,7 +1443,7 @@ namespace AccessTheObelisk
 
         private static bool IsSubmitHeld()
         {
-            return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter) || Input.GetKey(KeyCode.Space);
+            return ModInput.GetKey(KeyCode.Return) || ModInput.GetKey(KeyCode.KeypadEnter) || ModInput.GetKey(KeyCode.Space);
         }
 
         private static bool IsFirstAdventureAutoStart()

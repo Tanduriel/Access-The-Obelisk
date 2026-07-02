@@ -1,4 +1,4 @@
-﻿using BepInEx;
+using BepInEx;
 using HarmonyLib;
 using System.Collections;
 using UnityEngine;
@@ -20,7 +20,7 @@ namespace AccessTheObelisk
         /// <summary>
         /// Current mod version used by BepInEx and the update checker.
         /// </summary>
-        public const string PluginVersion = "0.4";
+        public const string PluginVersion = "0.5";
 
         private float _startupTimer;
         private float _lastMemoryLogTime;
@@ -43,14 +43,18 @@ namespace AccessTheObelisk
         private LootHandler _lootHandler;
         private FinishRunHandler _finishRunHandler;
         private PerkTreeHandler _perkTreeHandler;
+        private CharPopupHandler _charPopupHandler;
         private CorruptionHandler _corruptionHandler;
         private ConflictHandler _conflictHandler;
         private CharacterInfoHandler _characterInfoHandler;
         private CharacterDeckHandler _characterDeckHandler;
         private CardScreenHandler _cardScreenHandler;
         private TomeHandler _tomeHandler;
+        private CreditsHandler _creditsHandler;
         private ParadoxDocumentHandler _paradoxDocumentHandler;
         private LobbyHandler _lobbyHandler;
+        private ChatHandler _chatHandler;
+        private PlayersPopupHandler _playersPopupHandler;
         private GiveHandler _giveHandler;
         private StoryIntroHandler _storyIntroHandler;
         private CinematicHandler _cinematicHandler;
@@ -59,6 +63,7 @@ namespace AccessTheObelisk
         private CombatModalHandler _combatModalHandler;
         private CombatHandler _combatHandler;
         private UpdateCheckHandler _updateCheckHandler;
+        private VirtualKeyboardHandler _virtualKeyboardHandler;
 
         /// <summary>
         /// Enables verbose accessibility logging.
@@ -83,8 +88,7 @@ namespace AccessTheObelisk
             ModSettings.Initialize(Config);
             ScreenReader.Initialize();
             AccessStateManager.Initialize();
-            _mainMenuHandler = new MainMenuHandler();
-            _settingsHandler = new SettingsHandler();
+            _mainMenuHandler = new MainMenuHandler();            _settingsHandler = new SettingsHandler();
             _modSettingsHandler = new ModSettingsHandler();
             _alertHandler = new AlertHandler();
             _heroSelectionHandler = new HeroSelectionHandler();
@@ -100,14 +104,18 @@ namespace AccessTheObelisk
             _lootHandler = new LootHandler();
             _finishRunHandler = new FinishRunHandler();
             _perkTreeHandler = new PerkTreeHandler();
+            _charPopupHandler = new CharPopupHandler();
             _corruptionHandler = new CorruptionHandler();
             _conflictHandler = new ConflictHandler();
             _characterInfoHandler = new CharacterInfoHandler();
             _characterDeckHandler = new CharacterDeckHandler();
             _cardScreenHandler = new CardScreenHandler();
             _tomeHandler = new TomeHandler();
+            _creditsHandler = new CreditsHandler(_mainMenuHandler);
             _paradoxDocumentHandler = new ParadoxDocumentHandler();
             _lobbyHandler = new LobbyHandler();
+            _chatHandler = new ChatHandler();
+            _playersPopupHandler = new PlayersPopupHandler();
             _giveHandler = new GiveHandler();
             _storyIntroHandler = new StoryIntroHandler();
             _cinematicHandler = new CinematicHandler();
@@ -116,6 +124,7 @@ namespace AccessTheObelisk
             _combatModalHandler = new CombatModalHandler();
             _combatHandler = new CombatHandler();
             _updateCheckHandler = new UpdateCheckHandler();
+            _virtualKeyboardHandler = new VirtualKeyboardHandler();
             ApplyPatches();
             SceneManager.sceneLoaded += OnSceneLoaded;
             Logger.LogInfo("AccessTheObelisk initialized.");
@@ -124,11 +133,17 @@ namespace AccessTheObelisk
         private void Update()
         {
             ScreenReader.Update();
+            GamepadInput.Update();
             TrackActivationKeyForSpeechCleanup();
             ToggleDebugModeHotkey();
             LogMemoryDiagnosticsIfDue();
             AnnounceStartupOnce();
             if (_modSettingsHandler.Update())
+            {
+                return;
+            }
+
+            if (_virtualKeyboardHandler.Update())
             {
                 return;
             }
@@ -143,6 +158,11 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (_chatHandler.Update())
+            {
+                return;
+            }
+
             if (GameEventBuffer.Update())
             {
                 return;
@@ -150,6 +170,11 @@ namespace AccessTheObelisk
 
             bool tutorialActive = TutorialPopupHandler.Update();
             if (tutorialActive)
+            {
+                return;
+            }
+
+            if (_playersPopupHandler.Update())
             {
                 return;
             }
@@ -190,6 +215,11 @@ namespace AccessTheObelisk
             }
 
             if (_paradoxDocumentHandler.Update())
+            {
+                return;
+            }
+
+            if (_creditsHandler.Update())
             {
                 return;
             }
@@ -235,6 +265,11 @@ namespace AccessTheObelisk
             }
 
             if (_conflictHandler.Update())
+            {
+                return;
+            }
+
+            if (_charPopupHandler.Update())
             {
                 return;
             }
@@ -299,9 +334,9 @@ namespace AccessTheObelisk
 
         private static void TrackActivationKeyForSpeechCleanup()
         {
-            if (Input.GetKeyDown(KeyCode.Return) ||
-                Input.GetKeyDown(KeyCode.KeypadEnter) ||
-                Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) ||
+                ModInput.GetKeyDown(KeyCode.KeypadEnter) ||
+                ModInput.GetKeyDown(KeyCode.Space))
             {
                 ScreenReader.SuppressDuplicateActivationSpeech();
             }
@@ -309,9 +344,9 @@ namespace AccessTheObelisk
 
         private static void ToggleDebugModeHotkey()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-            if (!ctrl || !shift || !Input.GetKeyDown(KeyCode.F9))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            bool shift = ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
+            if (!ctrl || !shift || !ModInput.GetKeyDown(KeyCode.F9))
             {
                 return;
             }
@@ -354,6 +389,7 @@ namespace AccessTheObelisk
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             DebugLogger.LogState("Scene loaded: " + scene.name);
+            GamepadNavigation.ReleaseGamepadFromUi();
         }
 
         private void AnnounceStartupOnce()

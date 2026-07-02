@@ -1,5 +1,7 @@
 using HarmonyLib;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>

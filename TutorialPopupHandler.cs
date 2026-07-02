@@ -1,4 +1,4 @@
-﻿namespace AccessTheObelisk
+namespace AccessTheObelisk
 {
     /// <summary>
     /// Announces tutorial popups shown by the game.
@@ -19,7 +19,7 @@
             }
 
             AccessStateManager.SetState(AccessState.TutorialPopup);
-            if (UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Return) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.KeypadEnter) || UnityEngine.Input.GetKeyDown(UnityEngine.KeyCode.Space))
+            if (ModInput.GetKeyDown(UnityEngine.KeyCode.Return) || ModInput.GetKeyDown(UnityEngine.KeyCode.KeypadEnter) || ModInput.GetKeyDown(UnityEngine.KeyCode.Space))
             {
                 GameManager.Instance.HideTutorialPopup();
                 ScreenReader.Say(Loc.Get("tutorial_continue"));

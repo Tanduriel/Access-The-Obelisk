@@ -12,6 +12,8 @@ namespace AccessTheObelisk
         {
             MapDetails,
             EnemyPlayedCards,
+            RepeatSingleItem,
+            DeathEffectRemovals,
             Close
         }
 
@@ -19,6 +21,8 @@ namespace AccessTheObelisk
         {
             SettingKind.MapDetails,
             SettingKind.EnemyPlayedCards,
+            SettingKind.RepeatSingleItem,
+            SettingKind.DeathEffectRemovals,
             SettingKind.Close
         };
 
@@ -36,37 +40,37 @@ namespace AccessTheObelisk
             }
 
             AccessStateManager.SetState(AccessState.ModSettings);
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 Close();
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate();
                 return true;
@@ -82,8 +86,8 @@ namespace AccessTheObelisk
                 return false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (!ctrl || !Input.GetKeyDown(KeyCode.M))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (!ctrl || !ModInput.GetKeyDown(KeyCode.M))
             {
                 return false;
             }
@@ -133,6 +137,14 @@ namespace AccessTheObelisk
             {
                 ModSettings.EnemyPlayedCardsEnabled = !ModSettings.EnemyPlayedCardsEnabled;
             }
+            else if (item == SettingKind.RepeatSingleItem)
+            {
+                ModSettings.RepeatSingleItemEnabled = !ModSettings.RepeatSingleItemEnabled;
+            }
+            else if (item == SettingKind.DeathEffectRemovals)
+            {
+                ModSettings.DeathEffectRemovalsEnabled = !ModSettings.DeathEffectRemovalsEnabled;
+            }
 
             AnnounceFocused();
         }
@@ -158,6 +170,16 @@ namespace AccessTheObelisk
             if (item == SettingKind.EnemyPlayedCards)
             {
                 return Loc.Get("mod_settings_checkbox", Loc.Get("mod_settings_enemy_played_cards"), StateText(ModSettings.EnemyPlayedCardsEnabled));
+            }
+
+            if (item == SettingKind.RepeatSingleItem)
+            {
+                return Loc.Get("mod_settings_checkbox", Loc.Get("mod_settings_repeat_single_item"), StateText(ModSettings.RepeatSingleItemEnabled));
+            }
+
+            if (item == SettingKind.DeathEffectRemovals)
+            {
+                return Loc.Get("mod_settings_checkbox", Loc.Get("mod_settings_death_effect_removals"), StateText(ModSettings.DeathEffectRemovalsEnabled));
             }
 
             return Loc.Get("mod_settings_close");

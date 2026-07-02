@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -207,35 +209,35 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 if (NavigationBounds.TryMove(ref _index, 1, _items.Count))
                 {
                     SpeakFocus();
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow))
+            else if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 if (NavigationBounds.TryMove(ref _index, -1, _items.Count))
                 {
                     SpeakFocus();
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.Home))
+            else if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 if (NavigationBounds.TryJump(ref _index, false, _items.Count))
                 {
                     SpeakFocus();
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.End))
+            else if (ModInput.GetKeyDown(KeyCode.End))
             {
                 if (NavigationBounds.TryJump(ref _index, true, _items.Count))
                 {
                     SpeakFocus();
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            else if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate();
             }

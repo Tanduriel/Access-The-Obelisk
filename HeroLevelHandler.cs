@@ -1,9 +1,11 @@
 ﻿using HarmonyLib;
 using System.Collections.Generic;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
-    [HarmonyPatch(typeof(AtOManager), nameof(AtOManager.HeroLevelUp))]
+    [HarmonyPatch(typeof(AtOManager), nameof(AtOManager.HeroLevelUpMP))]
     internal static class HeroLevelHandler
     {
         private sealed class LevelSnapshot
@@ -54,7 +56,7 @@ namespace AccessTheObelisk
 
         private static Hero GetHero(AtOManager manager, int heroIndex)
         {
-            Hero[] team = manager != null ? manager.GetTeam() : null;
+            Hero[] team = manager != null ? manager.team.heroes.ToArray() : null;
             if (team == null || heroIndex < 0 || heroIndex >= team.Length)
             {
                 return null;
@@ -66,8 +68,18 @@ namespace AccessTheObelisk
         private static string BuildMessage(Hero hero, TraitData trait, LevelSnapshot previous)
         {
             string heroName = TextCleaner.ToSpeech(hero.SourceName);
-            string traitName = trait != null ? TextCleaner.ToSpeech(trait.TraitName) : Loc.Get("perk_unknown");
-            string traitDescription = trait != null ? TextCleaner.ToSpeech(trait.Description) : "";
+            string traitName = trait != null ? TextCleaner.ToSpeech(GameText.TraitName(trait)) : Loc.Get("perk_unknown");
+            string traitDescription = trait != null ? TextCleaner.ToSpeech(GameText.TraitDescription(trait)) : "";
+            if (string.IsNullOrWhiteSpace(traitDescription) && trait != null && trait.TraitCard != null)
+            {
+                CardRealtimeData card = Globals.Instance != null ? Globals.Instance.GetCardData(trait.TraitCard.Id, instantiate: false) : null;
+                string cardName = card != null ? TextCleaner.ToSpeech(GameText.CardName(card)) : "";
+                if (!string.IsNullOrWhiteSpace(cardName) && Texts.Instance != null)
+                {
+                    traitDescription = TextCleaner.ToSpeech(string.Format(Texts.Instance.GetText("traitAddCard"), cardName));
+                }
+            }
+
             string changes = BuildChanges(hero, previous);
             if (!string.IsNullOrWhiteSpace(changes))
             {

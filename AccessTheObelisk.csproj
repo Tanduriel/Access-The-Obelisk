@@ -8,14 +8,15 @@
     <CodePage>65001</CodePage>
     <AssemblyName>AccessTheObelisk</AssemblyName>
     <RootNamespace>AccessTheObelisk</RootNamespace>
-    <Version>0.4.0</Version>
-    <AssemblyVersion>0.4.0.0</AssemblyVersion>
-    <FileVersion>0.4.0.0</FileVersion>
-    <DefaultItemExcludes>$(DefaultItemExcludes);installer\**;bin\**;obj\**;dist\**</DefaultItemExcludes>
+    <Version>0.5.0</Version>
+    <AssemblyVersion>0.5.0.0</AssemblyVersion>
+    <FileVersion>0.5.0.0</FileVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);installer\**;bin\**;obj\**;dist\**;decompiled\**;decompiled-new\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Remove="decompiled\**" />
+    <Compile Remove="decompiled-new\**" />
     <Compile Remove="templates\**" />
     <Compile Remove="installer\**" />
   </ItemGroup>
@@ -26,62 +27,62 @@
 
   <ItemGroup>
     <Reference Include="BepInEx">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\BepInEx\core\BepInEx.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\BepInEx\core\BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\BepInEx\core\0Harmony.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\BepInEx\core\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Assembly-CSharp.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.Physics2DModule">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.Physics2DModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.InputSystem">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Unity.InputSystem.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\Unity.InputSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="PhotonUnityNetworking">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\PhotonUnityNetworking.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\PhotonUnityNetworking.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="PhotonRealtime">
-      <HintPath>D:\Across.the.Obelisk.v1.7.5.1\AcrossTheObelisk_Data\Managed\PhotonRealtime.dll</HintPath>
+      <HintPath>D:\SteamLibrary\steamapps\common\Across the Obelisk\AcrossTheObelisk_Data\Managed\PhotonRealtime.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

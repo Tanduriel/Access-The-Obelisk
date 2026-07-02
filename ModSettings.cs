@@ -9,6 +9,8 @@ namespace AccessTheObelisk
     {
         private static ConfigEntry<bool> _mapDetailsEnabled;
         private static ConfigEntry<bool> _enemyPlayedCardsEnabled;
+        private static ConfigEntry<bool> _repeatSingleItemEnabled;
+        private static ConfigEntry<bool> _deathEffectRemovalsEnabled;
 
         /// <summary>
         /// Initializes persisted mod settings.
@@ -26,6 +28,18 @@ namespace AccessTheObelisk
                 "EnemyPlayedCardsEnabled",
                 false,
                 "Speak enemy card names when enemies play visible cards in combat.");
+
+            _repeatSingleItemEnabled = config.Bind(
+                "Accessibility",
+                "RepeatSingleItemEnabled",
+                true,
+                "Re-announce the only item in a list when navigating, even though it is the sole element.");
+
+            _deathEffectRemovalsEnabled = config.Bind(
+                "Accessibility",
+                "DeathEffectRemovalsEnabled",
+                false,
+                "Speak effects removed from a dead target (hero or enemy).");
         }
 
         /// <summary>
@@ -54,6 +68,37 @@ namespace AccessTheObelisk
                 if (_enemyPlayedCardsEnabled != null)
                 {
                     _enemyPlayedCardsEnabled.Value = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// True when navigating re-announces a list's only item; false leaves it silent.
+        /// </summary>
+        public static bool RepeatSingleItemEnabled
+        {
+            get { return _repeatSingleItemEnabled == null || _repeatSingleItemEnabled.Value; }
+            set
+            {
+                if (_repeatSingleItemEnabled != null)
+                {
+                    _repeatSingleItemEnabled.Value = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// True when a dead target's own effect removals are announced;
+        /// false silences them and keeps only effect changes on other, still-living targets.
+        /// </summary>
+        public static bool DeathEffectRemovalsEnabled
+        {
+            get { return _deathEffectRemovalsEnabled != null && _deathEffectRemovalsEnabled.Value; }
+            set
+            {
+                if (_deathEffectRemovalsEnabled != null)
+                {
+                    _deathEffectRemovalsEnabled.Value = value;
                 }
             }
         }

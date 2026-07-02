@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -27,6 +27,7 @@ namespace AccessTheObelisk
         private string _lastHeader;
         private string _lastResult;
         private string _lastWaitingText;
+        private bool _pendingInitialFocusAnnouncement;
         private readonly HashSet<string> _announcedRollOutcomes = new HashSet<string>();
 
         /// <summary>
@@ -51,6 +52,7 @@ namespace AccessTheObelisk
             {
                 Refresh(manager);
                 AnnounceEventOnce(manager);
+                AnnouncePendingInitialFocus();
                 AnnounceRollOutcomeIfChanged(manager);
                 AnnounceResultIfChanged(manager);
                 AnnounceWaitingIfChanged(manager);
@@ -70,6 +72,7 @@ namespace AccessTheObelisk
             _lastHeader = null;
             _lastResult = null;
             _lastWaitingText = null;
+            _pendingInitialFocusAnnouncement = false;
             _announcedRollOutcomes.Clear();
         }
 
@@ -100,7 +103,7 @@ namespace AccessTheObelisk
 
         private void AddContinue(EventManager manager)
         {
-            if (manager.continueButton == null || !Functions.TransformIsVisible(manager.continueButton))
+            if (manager.continueButton == null || !Functions.TransformIsVisible(manager.continueButton.transform))
             {
                 return;
             }
@@ -222,6 +225,17 @@ namespace AccessTheObelisk
             _lastHeader = header;
             GameEventBuffer.Add(header);
             ScreenReader.Say(header);
+            _pendingInitialFocusAnnouncement = true;
+        }
+
+        private void AnnouncePendingInitialFocus()
+        {
+            if (!_pendingInitialFocusAnnouncement || CurrentItem() == null)
+            {
+                return;
+            }
+
+            _pendingInitialFocusAnnouncement = false;
             AnnounceFocusedItem(true);
         }
 
@@ -255,10 +269,7 @@ namespace AccessTheObelisk
 
         private void AnnounceRollOutcomeIfChanged(EventManager manager)
         {
-            AnnounceGlobalRollOutcome(manager.resultOK);
-            AnnounceGlobalRollOutcome(manager.resultOKc);
-            AnnounceGlobalRollOutcome(manager.resultKO);
-            AnnounceGlobalRollOutcome(manager.resultKOc);
+            AnnounceGlobalRollOutcome(manager.result);
             AnnounceCharacterRollOutcomes(manager);
         }
 
@@ -344,56 +355,56 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ActivateFocusedItem();
             }

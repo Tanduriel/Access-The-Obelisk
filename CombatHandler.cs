@@ -1,9 +1,12 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
+using BattleMatch;
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -19,11 +22,159 @@ namespace AccessTheObelisk
             Actions
         }
 
-        private enum EnemyBufferFocus
+        /// <summary>
+        /// A sub-buffer reachable with Control plus Left or Right while a combat item
+        /// is focused. Each sub-buffer owns its availability, its switch-in
+        /// announcement, and its per-line navigation. Adding a new sub-buffer means
+        /// adding one class and listing it in <see cref="_subBuffers"/> — the
+        /// navigation core does not change.
+        /// </summary>
+        private abstract class SubBuffer
         {
-            Details,
-            RevealedCards,
-            Events
+            /// <summary>Whether this sub-buffer is reachable in the handler's current zone.</summary>
+            public abstract bool IsAvailable(CombatHandler h);
+
+            /// <summary>Announces the sub-buffer when it gains focus.</summary>
+            public abstract void Enter(CombatHandler h);
+
+            /// <summary>Moves the read cursor by <paramref name="delta"/> lines.</summary>
+            public abstract void MoveLine(CombatHandler h, int delta);
+
+            /// <summary>Jumps the read cursor to the first or last line.</summary>
+            public abstract void JumpLine(CombatHandler h, bool end);
+        }
+
+        /// <summary>
+        /// The default sub-buffer: the focused item's own detail lines. Delegates to
+        /// the handler's existing line navigation so its empty-zone and
+        /// repeat-single-item behaviour is preserved.
+        /// </summary>
+        private sealed class DetailsSubBuffer : SubBuffer
+        {
+            public override bool IsAvailable(CombatHandler h) => true;
+
+            public override void Enter(CombatHandler h)
+            {
+                ScreenReader.Say(Loc.Get(h._zone == CombatZone.Enemies ? "combat_enemy_info_buffer" : "combat_info_buffer"));
+                h.AnnounceFocusedItem();
+            }
+
+            public override void MoveLine(CombatHandler h, int delta) => h.MoveLine(delta);
+
+            public override void JumpLine(CombatHandler h, bool end) => h.JumpLine(end);
+        }
+
+        /// <summary>
+        /// Base for sub-buffers that present a freshly built list of strings for the
+        /// focused item, with uniform move/jump/announce behaviour. Subclasses supply
+        /// only the heading, the empty message, and the line source.
+        /// </summary>
+        private abstract class LineSubBuffer : SubBuffer
+        {
+            protected abstract string Label { get; }
+
+            protected abstract string EmptyMessage { get; }
+
+            protected abstract List<string> BuildLines(CombatHandler h);
+
+            public override void Enter(CombatHandler h)
+            {
+                List<string> lines = BuildLines(h);
+                ScreenReader.Say(Label);
+                if (lines.Count == 0)
+                {
+                    ScreenReader.SayQueued(EmptyMessage);
+                    return;
+                }
+
+                if (h._lineIndex < 0 || h._lineIndex >= lines.Count)
+                {
+                    h._lineIndex = 0;
+                }
+
+                ScreenReader.SayQueued(lines[h._lineIndex]);
+            }
+
+            public override void MoveLine(CombatHandler h, int delta)
+            {
+                List<string> lines = BuildLines(h);
+                if (lines.Count == 0)
+                {
+                    ScreenReader.Say(EmptyMessage);
+                    return;
+                }
+
+                if (!NavigationBounds.TryMove(ref h._lineIndex, delta, lines.Count))
+                {
+                    return;
+                }
+
+                ScreenReader.Say(lines[h._lineIndex]);
+            }
+
+            public override void JumpLine(CombatHandler h, bool end)
+            {
+                List<string> lines = BuildLines(h);
+                if (lines.Count == 0)
+                {
+                    ScreenReader.Say(EmptyMessage);
+                    return;
+                }
+
+                if (!NavigationBounds.TryJump(ref h._lineIndex, end, lines.Count))
+                {
+                    return;
+                }
+
+                ScreenReader.Say(lines[h._lineIndex]);
+            }
+        }
+
+        /// <summary>Damage resistances, immunities and vulnerabilities of the focused character.</summary>
+        private sealed class ResistanceSubBuffer : LineSubBuffer
+        {
+            public override bool IsAvailable(CombatHandler h) =>
+                h._zone == CombatZone.Enemies || h._zone == CombatZone.Party;
+
+            protected override string Label => Loc.Get("combat_resist_buffer");
+
+            protected override string EmptyMessage => Loc.Get("combat_resist_none_short");
+
+            protected override List<string> BuildLines(CombatHandler h)
+            {
+                BufferItem item = h.CurrentItem();
+                return BuildResistanceLines(item != null ? item.Character : null);
+            }
+        }
+
+        /// <summary>Intent cards a focused enemy has revealed this round.</summary>
+        private sealed class RevealedCardsSubBuffer : LineSubBuffer
+        {
+            public override bool IsAvailable(CombatHandler h) => h._zone == CombatZone.Enemies;
+
+            protected override string Label => Loc.Get("combat_revealed_cards");
+
+            protected override string EmptyMessage => Loc.Get("combat_no_revealed_cards");
+
+            protected override List<string> BuildLines(CombatHandler h)
+            {
+                BufferItem item = h.CurrentItem();
+                NPC npc = item != null ? item.Character as NPC : null;
+                return BuildRevealedNpcCardLines(npc);
+            }
+        }
+
+        /// <summary>The shared combat event log, owned by <see cref="GameEventBuffer"/>.</summary>
+        private sealed class EventsSubBuffer : SubBuffer
+        {
+            public override bool IsAvailable(CombatHandler h) => true;
+
+            public override void Enter(CombatHandler h) => GameEventBuffer.FocusLatest();
+
+            public override void MoveLine(CombatHandler h, int delta) =>
+                GameEventBuffer.MoveFocused(delta > 0 ? -1 : 1);
+
+            public override void JumpLine(CombatHandler h, bool end) => GameEventBuffer.JumpFocused(end);
         }
 
         private sealed class BufferItem
@@ -51,7 +202,7 @@ namespace AccessTheObelisk
 
         private static readonly FieldInfo CardItemTableField = AccessTools.Field(typeof(MatchManager), "cardItemTable");
         private static readonly FieldInfo AddcardSelectorField = AccessTools.Field(typeof(MatchManager), "addcardSelector");
-        private static readonly FieldInfo CharOrderField = AccessTools.Field(typeof(MatchManager), "CharOrder");
+        private static readonly FieldInfo CharOrderField = AccessTools.Field(typeof(InitiativesManager), "CharOrder");
         private static readonly FieldInfo EnergySelectorMaxEnergyField = AccessTools.Field(typeof(UIEnergySelector), "maxEnergy");
         private static readonly FieldInfo EnergySelectorMaxAssignedField = AccessTools.Field(typeof(UIEnergySelector), "maxEnergyToBeAssigned");
         private static readonly FieldInfo DiscardSelectorNonLimitedField = AccessTools.Field(typeof(UIDiscardSelector), "nonLimitedNumCards");
@@ -82,7 +233,19 @@ namespace AccessTheObelisk
         private int _targetIndex;
         private int _actionCardIndex;
         private int _lineIndex;
-        private EnemyBufferFocus _enemyBufferFocus;
+
+        private readonly SubBuffer _detailsBuffer = new DetailsSubBuffer();
+        private readonly SubBuffer _resistanceBuffer = new ResistanceSubBuffer();
+        private readonly SubBuffer _revealedCardsBuffer = new RevealedCardsSubBuffer();
+        private readonly SubBuffer _eventsBuffer = new EventsSubBuffer();
+
+        /// <summary>
+        /// All sub-buffers in Control plus Left or Right rotation order. The available
+        /// subset per zone is filtered through <see cref="SubBuffer.IsAvailable"/>.
+        /// </summary>
+        private readonly List<SubBuffer> _subBuffers;
+
+        private SubBuffer _subBuffer;
         private bool _combatAnnounced;
         private bool _targetModeAnnounced;
         private bool _actionModeAnnounced;
@@ -93,6 +256,12 @@ namespace AccessTheObelisk
         private string _lastTurnKey;
         private string _lastEnergySelectionText;
         private string _actionCardsSignature;
+
+        public CombatHandler()
+        {
+            _subBuffers = new List<SubBuffer> { _detailsBuffer, _resistanceBuffer, _revealedCardsBuffer, _eventsBuffer };
+            _subBuffer = _detailsBuffer;
+        }
 
         /// <summary>
         /// Updates combat buffer navigation and state-change announcements.
@@ -134,7 +303,7 @@ namespace AccessTheObelisk
             _lastRound = -1;
             _lastTurnKey = null;
             _lineIndex = 0;
-            _enemyBufferFocus = EnemyBufferFocus.Details;
+            _subBuffer = _detailsBuffer;
             _cardIndex = 0;
             _enemyIndex = 0;
             _partyIndex = 0;
@@ -163,7 +332,17 @@ namespace AccessTheObelisk
                 return;
             }
 
+            if (TryAnnounceBlockShieldHotkey(match))
+            {
+                return;
+            }
+
             if (TryAnnounceFocusedEffectsHotkey(match))
+            {
+                return;
+            }
+
+            if (TryAnnounceResistancesHotkey(match))
             {
                 return;
             }
@@ -200,7 +379,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Space))
             {
                 EndTurnFromKeyboard(match);
                 return;
@@ -213,73 +392,73 @@ namespace AccessTheObelisk
             }
 
             bool ctrl = IsControlPressed();
-            if (ctrl && (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow) || UnityEngine.Input.GetKeyDown(KeyCode.RightArrow)))
+            if (ctrl && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
-                MoveControlBuffer(UnityEngine.Input.GetKeyDown(KeyCode.RightArrow) ? 1 : -1);
+                MoveControlBuffer(ModInput.GetKeyDown(KeyCode.RightArrow) ? 1 : -1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveControlLine(1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveControlLine(-1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpControlLine(false);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpControlLine(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpItem(false);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpItem(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveItem(-1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveItem(1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveZone(1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveZone(-1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ActivateFocusedItem();
             }
@@ -295,21 +474,21 @@ namespace AccessTheObelisk
                 AnnounceEnergySelection(match, includeInstructions: true);
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow) || UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 match.EnergySelector.AssignEnergyLess();
                 AnnounceEnergySelection(match, includeInstructions: false);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow) || UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 match.EnergySelector.AssignEnergyMore();
                 AnnounceEnergySelection(match, includeInstructions: false);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter) || UnityEngine.Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 string energy = ReadAssignedEnergy(match);
                 ScreenReader.Say(Loc.Get("combat_energy_assigned", energy));
@@ -334,55 +513,85 @@ namespace AccessTheObelisk
             }
 
             bool ctrl = IsControlPressed();
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
+                ToggleEventBufferFocus();
+                return;
+            }
+
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.MoveFocused(-1);
+                    return;
+                }
+
                 MoveTargetLine(1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.MoveFocused(1);
+                    return;
+                }
+
                 MoveTargetLine(-1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.JumpFocused(false);
+                    return;
+                }
+
                 JumpTargetLine(false);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.JumpFocused(true);
+                    return;
+                }
+
                 JumpTargetLine(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpTarget(false);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpTarget(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveTarget(-1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveTarget(1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ConfirmTarget(match);
             }
@@ -406,67 +615,97 @@ namespace AccessTheObelisk
             }
 
             bool ctrl = IsControlPressed();
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.RightArrow)))
             {
+                ToggleEventBufferFocus();
+                return;
+            }
+
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
+            {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.MoveFocused(-1);
+                    return;
+                }
+
                 MoveActionLine(1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.MoveFocused(1);
+                    return;
+                }
+
                 MoveActionLine(-1);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.JumpFocused(false);
+                    return;
+                }
+
                 JumpActionLine(false);
                 return;
             }
 
-            if (ctrl && UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
+                if (GameEventBuffer.IsFocused)
+                {
+                    GameEventBuffer.JumpFocused(true);
+                    return;
+                }
+
                 JumpActionLine(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpActionCard(false);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpActionCard(true);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow) || UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveActionCard(-1);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow) || UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveActionCard(1);
                 return;
             }
 
-            if (ctrl && (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter)))
+            if (ctrl && (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter)))
             {
                 ConfirmActionSelection(match);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ToggleActionCard(match);
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Space))
             {
                 ConfirmActionSelection(match);
             }
@@ -491,7 +730,7 @@ namespace AccessTheObelisk
 
             _zone = (CombatZone)zone;
             _lineIndex = 0;
-            SetEnemyBufferFocus(EnemyBufferFocus.Details, false);
+            Activate(_detailsBuffer, false);
             AnnounceFocusedItem();
         }
 
@@ -514,14 +753,14 @@ namespace AccessTheObelisk
                 index = items.Count - 1;
             }
 
-            if (index == CurrentIndex() && items.Count > 1)
+            if (index == CurrentIndex() && (items.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
 
             SetCurrentIndex(index);
             _lineIndex = 0;
-            SetEnemyBufferFocus(EnemyBufferFocus.Details, false);
+            Activate(_detailsBuffer, false);
             AnnounceFocusedItem();
         }
 
@@ -542,52 +781,46 @@ namespace AccessTheObelisk
 
             SetCurrentIndex(index);
             _lineIndex = 0;
-            SetEnemyBufferFocus(EnemyBufferFocus.Details, false);
+            Activate(_detailsBuffer, false);
             AnnounceFocusedItem();
         }
 
         private void MoveControlBuffer(int delta)
         {
-            if (_zone != CombatZone.Enemies)
+            List<SubBuffer> available = AvailableSubBuffers();
+            int index = available.IndexOf(_subBuffer);
+            if (index < 0)
             {
-                if (GameEventBuffer.IsFocused)
-                {
-                    GameEventBuffer.LeaveFocus(true);
-                }
-                else
-                {
-                    GameEventBuffer.FocusLatest();
-                }
-
-                return;
+                index = 0;
             }
 
-            int next = ((int)_enemyBufferFocus + delta + 3) % 3;
-            SetEnemyBufferFocus((EnemyBufferFocus)next, true);
+            int next = ((index + delta) % available.Count + available.Count) % available.Count;
+            Activate(available[next], true);
         }
 
-        private void SetEnemyBufferFocus(EnemyBufferFocus focus, bool announce)
+        /// <summary>
+        /// Returns the sub-buffers reachable with Control plus Left or Right in the
+        /// current zone, in rotation order, by filtering <see cref="_subBuffers"/>.
+        /// </summary>
+        private List<SubBuffer> AvailableSubBuffers()
         {
-            if (focus != EnemyBufferFocus.Events)
+            List<SubBuffer> available = new List<SubBuffer>();
+            for (int i = 0; i < _subBuffers.Count; i++)
             {
-                GameEventBuffer.LeaveFocus(false);
+                if (_subBuffers[i].IsAvailable(this))
+                {
+                    available.Add(_subBuffers[i]);
+                }
             }
 
-            _enemyBufferFocus = focus;
-            _lineIndex = 0;
-            if (!announce)
-            {
-                return;
-            }
+            return available;
+        }
 
-            if (_enemyBufferFocus == EnemyBufferFocus.Details)
+        private static void ToggleEventBufferFocus()
+        {
+            if (GameEventBuffer.IsFocused)
             {
-                ScreenReader.Say(Loc.Get("combat_enemy_info_buffer"));
-                AnnounceFocusedItem();
-            }
-            else if (_enemyBufferFocus == EnemyBufferFocus.RevealedCards)
-            {
-                AnnounceRevealedCardLine();
+                GameEventBuffer.LeaveFocus(true);
             }
             else
             {
@@ -595,38 +828,47 @@ namespace AccessTheObelisk
             }
         }
 
-        private void MoveControlLine(int delta)
+        /// <summary>
+        /// Switches the focused sub-buffer. Leaves the shared event log unless the new
+        /// sub-buffer is the event log itself, mirroring the previous focus handling.
+        /// </summary>
+        private void Activate(SubBuffer buffer, bool announce)
         {
-            if (_zone == CombatZone.Enemies && _enemyBufferFocus == EnemyBufferFocus.RevealedCards)
+            if (!(buffer is EventsSubBuffer))
             {
-                MoveRevealedCardLine(delta);
-                return;
+                GameEventBuffer.LeaveFocus(false);
             }
 
-            if (_zone == CombatZone.Enemies && _enemyBufferFocus == EnemyBufferFocus.Events)
+            _subBuffer = buffer;
+            _lineIndex = 0;
+            if (announce)
+            {
+                buffer.Enter(this);
+            }
+        }
+
+        private void MoveControlLine(int delta)
+        {
+            // The event log can also be focused via its global hotkey; honour that
+            // regardless of which sub-buffer is active.
+            if (GameEventBuffer.IsFocused)
             {
                 GameEventBuffer.MoveFocused(delta > 0 ? -1 : 1);
                 return;
             }
 
-            MoveLine(delta);
+            _subBuffer.MoveLine(this, delta);
         }
 
         private void JumpControlLine(bool end)
         {
-            if (_zone == CombatZone.Enemies && _enemyBufferFocus == EnemyBufferFocus.RevealedCards)
-            {
-                JumpRevealedCardLine(end);
-                return;
-            }
-
-            if (_zone == CombatZone.Enemies && _enemyBufferFocus == EnemyBufferFocus.Events)
+            if (GameEventBuffer.IsFocused)
             {
                 GameEventBuffer.JumpFocused(end);
                 return;
             }
 
-            JumpLine(end);
+            _subBuffer.JumpLine(this, end);
         }
 
         private void MoveLine(int delta)
@@ -649,7 +891,7 @@ namespace AccessTheObelisk
                 _lineIndex = item.Lines.Count - 1;
             }
 
-            if (_lineIndex == previousLineIndex && item.Lines.Count > 1)
+            if (_lineIndex == previousLineIndex && (item.Lines.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -711,7 +953,7 @@ namespace AccessTheObelisk
             }
 
             _lastRound = round;
-            string message = ReadRoundText(match, round);
+            string message = ReadRoundText(round);
             if (string.IsNullOrWhiteSpace(message))
             {
                 return;
@@ -721,14 +963,11 @@ namespace AccessTheObelisk
             ScreenReader.SayQueued(message);
         }
 
-        private static string ReadRoundText(MatchManager match, int round)
+        private static string ReadRoundText(int round)
         {
-            string visibleText = match.roundTM != null ? Clean(match.roundTM.text) : string.Empty;
-            if (!string.IsNullOrWhiteSpace(visibleText))
-            {
-                return visibleText;
-            }
-
+            // Build the text from the reliable round number rather than match.roundTM.text:
+            // the visible TextMeshPro value is not refreshed yet when the round announcement
+            // fires, so it lags one round behind (empty/0 on the first round).
             string gameText = GameText.Get("roundNumber");
             if (!string.IsNullOrWhiteSpace(gameText))
             {
@@ -762,8 +1001,8 @@ namespace AccessTheObelisk
             }
 
             _lastTurnKey = key;
-            Hero[] heroes = match.GetTeamHero();
-            NPC[] npcs = match.GetTeamNPC();
+            Hero[] heroes = TeamHeroes(match);
+            NPC[] npcs = TeamNpcs(match);
             if (heroActive >= 0 && heroes != null && heroActive < heroes.Length && heroes[heroActive] != null)
             {
                 Hero hero = heroes[heroActive];
@@ -788,7 +1027,7 @@ namespace AccessTheObelisk
             }
             else if (force)
             {
-                string message = Loc.Get("combat_turn_status", Clean(match.GameStatus));
+                string message = Loc.Get("combat_turn_status", Clean(match.GameStatus.ToString()));
                 GameEventBuffer.Add(message);
                 ScreenReader.SayQueued(message);
             }
@@ -807,19 +1046,61 @@ namespace AccessTheObelisk
 
         private static string GetTurnAnnouncementKey(MatchManager match, int heroActive, int npcActive)
         {
-            Hero[] heroes = match.GetTeamHero();
+            Hero[] heroes = TeamHeroes(match);
             if (heroActive >= 0 && heroes != null && heroActive < heroes.Length && heroes[heroActive] != null)
             {
                 return "hero:" + heroActive;
             }
 
-            NPC[] npcs = match.GetTeamNPC();
+            NPC[] npcs = TeamNpcs(match);
             if (npcActive >= 0 && npcs != null && npcActive < npcs.Length && npcs[npcActive] != null)
             {
                 return "npc:" + npcActive;
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Returns the hero team as a position-indexed array (null in empty slots), mirroring the
+        /// pre-update <c>GetTeamHero</c> array now that the game exposes a <see cref="BattleMatch.Team"/>.
+        /// </summary>
+        private static Hero[] TeamHeroes(MatchManager match)
+        {
+            BattleMatch.Team team = match != null ? match.GetTeamHero() : null;
+            if (team == null)
+            {
+                return null;
+            }
+
+            Hero[] result = new Hero[team.Count];
+            for (int i = 0; i < team.Count; i++)
+            {
+                result[i] = team[i] as Hero;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Returns the enemy team as a position-indexed array (null in empty slots), mirroring the
+        /// pre-update <c>GetTeamNPC</c> array now that the game exposes a <see cref="BattleMatch.Team"/>.
+        /// </summary>
+        private static NPC[] TeamNpcs(MatchManager match)
+        {
+            BattleMatch.Team team = match != null ? match.GetTeamNPC() : null;
+            if (team == null)
+            {
+                return null;
+            }
+
+            NPC[] result = new NPC[team.Count];
+            for (int i = 0; i < team.Count; i++)
+            {
+                result[i] = team[i] as NPC;
+            }
+
+            return result;
         }
 
         private void RefreshBuffers(MatchManager match)
@@ -830,8 +1111,8 @@ namespace AccessTheObelisk
             _combatActions.Clear();
 
             AddCards(match);
-            AddCharacters(match.GetTeamNPC(), _enemies);
-            AddCharacters(match.GetTeamHero(), _party);
+            AddCharacters(TeamNpcs(match), _enemies);
+            AddCharacters(TeamHeroes(match), _party);
             AddCombatActions(match);
             ClampIndexes();
         }
@@ -900,11 +1181,11 @@ namespace AccessTheObelisk
             BufferItem item = new BufferItem();
             item.CombatAction = "item";
             item.ItemIcon = icon;
-            CardData data = ReadItemIconCardData(icon);
+            CardRealtimeData data = ReadItemIconCardData(icon);
             if (data != null)
             {
                 item.Summary = Loc.Get("character_item_summary", slotLabel, CardSpeech.BuildItemFocusSummary(data));
-                item.Lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
+                item.Lines.AddRange(CardSpeech.BuildDetailLines(data, data.EnergyCost));
             }
             else
             {
@@ -915,7 +1196,7 @@ namespace AccessTheObelisk
             _combatActions.Add(item);
         }
 
-        private static CardData ReadItemIconCardData(ItemCombatIcon icon)
+        private static CardRealtimeData ReadItemIconCardData(ItemCombatIcon icon)
         {
             if (icon == null || ItemCombatIconCardDataField == null)
             {
@@ -924,7 +1205,7 @@ namespace AccessTheObelisk
 
             try
             {
-                return ItemCombatIconCardDataField.GetValue(icon) as CardData;
+                return ItemCombatIconCardDataField.GetValue(icon) as CardRealtimeData;
             }
             catch (Exception ex)
             {
@@ -943,8 +1224,8 @@ namespace AccessTheObelisk
                 return;
             }
 
-            AddTargetCharacters(match, match.GetTeamHero());
-            AddTargetCharacters(match, match.GetTeamNPC());
+            AddTargetCharacters(match, TeamHeroes(match));
+            AddTargetCharacters(match, TeamNpcs(match));
             _targetIndex = ClampIndex(_targetIndex, _targets.Count);
         }
 
@@ -989,7 +1270,7 @@ namespace AccessTheObelisk
                     continue;
                 }
 
-                bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? card.cardselectedfordiscard : card.cardselectedforaddcard;
+                bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? card.cardselectedfordiscard : card.cardSelectedForAddCard;
                 selectableCards.Add(card);
                 signature.Append(card.GetInstanceID()).Append(selected ? ":1;" : ":0;");
             }
@@ -1006,7 +1287,7 @@ namespace AccessTheObelisk
             for (int i = 0; i < selectableCards.Count; i++)
             {
                 CardItem card = selectableCards[i];
-                bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? card.cardselectedfordiscard : card.cardselectedforaddcard;
+                bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? card.cardselectedfordiscard : card.cardSelectedForAddCard;
                 _actionCards.Add(BuildActionCardItem(card, selected));
             }
 
@@ -1151,7 +1432,7 @@ namespace AccessTheObelisk
 
         private static BufferItem BuildCardItem(CardItem card, int position, int total)
         {
-            CardData data = card.CardData;
+            CardRealtimeData data = card.CardData;
             BufferItem item = new BufferItem();
             item.Card = card;
             int cost = card.GetEnergyCost();
@@ -1162,7 +1443,7 @@ namespace AccessTheObelisk
 
         private static BufferItem BuildActionCardItem(CardItem card, bool selected)
         {
-            CardData data = card.CardData;
+            CardRealtimeData data = card.CardData;
             BufferItem item = new BufferItem();
             item.Card = card;
             item.ActionSelectionLine = selected ? Loc.Get("combat_action_card_selected") : Loc.Get("combat_action_card_not_selected");
@@ -1327,60 +1608,6 @@ namespace AccessTheObelisk
             return character.NPCItem;
         }
 
-        private void MoveRevealedCardLine(int delta)
-        {
-            List<string> lines = CurrentRevealedCardLines();
-            if (lines.Count == 0)
-            {
-                ScreenReader.Say(Loc.Get("combat_no_revealed_cards"));
-                return;
-            }
-
-            if (!NavigationBounds.TryMove(ref _lineIndex, delta, lines.Count))
-            {
-                return;
-            }
-
-            ScreenReader.Say(lines[_lineIndex]);
-        }
-
-        private void JumpRevealedCardLine(bool end)
-        {
-            List<string> lines = CurrentRevealedCardLines();
-            if (lines.Count == 0)
-            {
-                ScreenReader.Say(Loc.Get("combat_no_revealed_cards"));
-                return;
-            }
-
-            if (!NavigationBounds.TryJump(ref _lineIndex, end, lines.Count))
-            {
-                return;
-            }
-
-            ScreenReader.Say(lines[_lineIndex]);
-        }
-
-        private void AnnounceRevealedCardLine()
-        {
-            List<string> lines = CurrentRevealedCardLines();
-            if (lines.Count == 0)
-            {
-                ScreenReader.Say(Loc.Get("combat_no_revealed_cards"));
-                return;
-            }
-
-            ScreenReader.Say(Loc.Get("combat_revealed_cards"));
-            ScreenReader.SayQueued(lines[_lineIndex]);
-        }
-
-        private List<string> CurrentRevealedCardLines()
-        {
-            BufferItem item = CurrentItem();
-            NPC npc = item != null ? item.Character as NPC : null;
-            return BuildRevealedNpcCardLines(npc);
-        }
-
         private static List<string> BuildRevealedNpcCardLines(NPC npc)
         {
             List<string> lines = new List<string>();
@@ -1410,6 +1637,79 @@ namespace AccessTheObelisk
             return lines;
         }
 
+        private static readonly Enums.DamageType[] ResistDamageTypes =
+        {
+            Enums.DamageType.Slashing,
+            Enums.DamageType.Blunt,
+            Enums.DamageType.Piercing,
+            Enums.DamageType.Fire,
+            Enums.DamageType.Cold,
+            Enums.DamageType.Lightning,
+            Enums.DamageType.Mind,
+            Enums.DamageType.Holy,
+            Enums.DamageType.Shadow
+        };
+
+        /// <summary>
+        /// Builds one line per meaningful damage type for the focused character,
+        /// grouped immunities first, then vulnerabilities, then resistances. Damage
+        /// types with no effect (zero) are skipped. Values come from
+        /// <see cref="Character.BonusResists"/> so combat modifiers (challenge traits,
+        /// auras, immunities) are reflected, not just the base sheet.
+        /// </summary>
+        private static List<string> BuildResistanceLines(Character character)
+        {
+            List<string> lines = new List<string>();
+            if (character == null)
+            {
+                return lines;
+            }
+
+            List<string> immune = new List<string>();
+            List<string> vulnerable = new List<string>();
+            List<string> resistant = new List<string>();
+            for (int i = 0; i < ResistDamageTypes.Length; i++)
+            {
+                Enums.DamageType type = ResistDamageTypes[i];
+                int value = character.BonusResists(type);
+                string name = GameText.DamageTypeName(type);
+                if (value >= 1000)
+                {
+                    immune.Add(Loc.Get("combat_resist_immune", name));
+                }
+                else if (value < 0)
+                {
+                    vulnerable.Add(Loc.Get("combat_resist_vulnerable", name, -value));
+                }
+                else if (value > 0)
+                {
+                    resistant.Add(Loc.Get("combat_resist_value", name, value));
+                }
+            }
+
+            lines.AddRange(immune);
+            lines.AddRange(vulnerable);
+            lines.AddRange(resistant);
+            return lines;
+        }
+
+        private static string BuildResistanceSummary(Character character)
+        {
+            if (character == null)
+            {
+                return Loc.Get("combat_character_unavailable");
+            }
+
+            List<string> lines = BuildResistanceLines(character);
+            string name = Clean(character.SourceName);
+            if (lines.Count == 0)
+            {
+                return Loc.Get("combat_resist_none", name);
+            }
+
+            return Loc.Get("combat_resist_summary", name, string.Join(" ", lines.ToArray()));
+        }
+
         private static Transform GetCharacterTargetTransform(Character character)
         {
             if (character is NPC)
@@ -1422,15 +1722,15 @@ namespace AccessTheObelisk
 
         private static void AddCharacterEffects(BufferItem item, Character character)
         {
-            if (character.AuraList == null || character.AuraList.Count == 0)
+            if (character.AuraCurseList == null || character.AuraCurseList.Count == 0)
             {
                 AddLine(item, Loc.Get("combat_no_effects"));
                 return;
             }
 
-            for (int i = 0; i < character.AuraList.Count; i++)
+            for (int i = 0; i < character.AuraCurseList.Count; i++)
             {
-                Aura aura = character.AuraList[i];
+                AuraCurse aura = character.AuraCurseList[i];
                 if (aura == null || aura.ACData == null || aura.AuraCharges == 0)
                 {
                     continue;
@@ -1449,8 +1749,8 @@ namespace AccessTheObelisk
         private void AnnounceStateChanges(MatchManager match)
         {
             Dictionary<string, CharacterSnapshot> current = new Dictionary<string, CharacterSnapshot>();
-            SnapshotCharacters(match.GetTeamHero(), current);
-            SnapshotCharacters(match.GetTeamNPC(), current);
+            SnapshotCharacters(TeamHeroes(match), current);
+            SnapshotCharacters(TeamNpcs(match), current);
 
             foreach (KeyValuePair<string, CharacterSnapshot> pair in current)
             {
@@ -1493,11 +1793,11 @@ namespace AccessTheObelisk
                     Alive = character.Alive,
                     IsHero = character.HeroItem != null
                 };
-                if (character.AuraList != null)
+                if (character.AuraCurseList != null)
                 {
-                    for (int j = 0; j < character.AuraList.Count; j++)
+                    for (int j = 0; j < character.AuraCurseList.Count; j++)
                     {
-                        Aura aura = character.AuraList[j];
+                        AuraCurse aura = character.AuraCurseList[j];
                         if (aura != null && aura.ACData != null && aura.AuraCharges != 0)
                         {
                             snapshot.Effects[Clean(GameText.AuraCurseName(aura.ACData))] = aura.AuraCharges;
@@ -1521,7 +1821,8 @@ namespace AccessTheObelisk
                 ScreenReader.SayQueued(message);
             }
 
-            if (previous.Alive && !current.Alive)
+            bool justDied = previous.Alive && !current.Alive;
+            if (justDied)
             {
                 string message = Loc.Get(current.IsHero ? "combat_hero_died" : "combat_enemy_died", current.Name);
                 GameEventBuffer.Add(message);
@@ -1543,6 +1844,11 @@ namespace AccessTheObelisk
                     GameEventBuffer.Add(message);
                     ScreenReader.SayQueued(message);
                 }
+            }
+
+            if (!current.Alive && !ModSettings.DeathEffectRemovalsEnabled)
+            {
+                return;
             }
 
             foreach (KeyValuePair<string, int> effect in previous.Effects)
@@ -1608,8 +1914,8 @@ namespace AccessTheObelisk
             match.SetCardActive(card.CardData);
             match.SetDamagePreview(theCasterIsHero: true, card.CardData, card.tablePosition);
             List<string> previews = new List<string>();
-            AddImmediateCardPreviewForCharacters(previews, match.GetTeamHero(), card.CardData);
-            AddImmediateCardPreviewForCharacters(previews, match.GetTeamNPC(), card.CardData);
+            AddImmediateCardPreviewForCharacters(previews, TeamHeroes(match), card.CardData);
+            AddImmediateCardPreviewForCharacters(previews, TeamNpcs(match), card.CardData);
             if (previews.Count == 0)
             {
                 return string.Empty;
@@ -1618,7 +1924,7 @@ namespace AccessTheObelisk
             return Loc.Get("combat_immediate_card_preview", string.Join(" ", previews.ToArray()));
         }
 
-        private static void AddImmediateCardPreviewForCharacters(List<string> previews, Character[] characters, CardData cardData)
+        private static void AddImmediateCardPreviewForCharacters(List<string> previews, Character[] characters, CardRealtimeData cardData)
         {
             if (characters == null)
             {
@@ -1750,7 +2056,7 @@ namespace AccessTheObelisk
 
             if (item.CombatAction == "item" && item.ItemIcon != null)
             {
-                CardData data = ReadItemIconCardData(item.ItemIcon);
+                CardRealtimeData data = ReadItemIconCardData(item.ItemIcon);
                 if (data != null)
                 {
                     CardScreenHandler.Open(data);
@@ -1773,7 +2079,7 @@ namespace AccessTheObelisk
             string message = Loc.Get("combat_end_turn");
             GameEventBuffer.Add(message);
             ScreenReader.Say(message);
-            match.KeyboardSpace();
+            match.Keyboard.KeyboardSpace();
         }
 
         private void MoveActionCard(int delta)
@@ -1864,7 +2170,7 @@ namespace AccessTheObelisk
                 match.SelectCardToAddcard(item.Card);
             }
 
-            bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? item.Card.cardselectedfordiscard : item.Card.cardselectedforaddcard;
+            bool selected = match.WaitingForDiscardAssignment || match.WaitingForLookDiscardWindow ? item.Card.cardselectedfordiscard : item.Card.cardSelectedForAddCard;
             string message = Loc.Get(selected ? "combat_action_card_marked" : "combat_action_card_unmarked", Clean(item.Card.CardData != null ? item.Card.CardData.CardName : ""));
             GameEventBuffer.Add(message);
             ScreenReader.Say(message);
@@ -1973,7 +2279,7 @@ namespace AccessTheObelisk
                 nextIndex = _targets.Count - 1;
             }
 
-            if (nextIndex == _targetIndex && _targets.Count > 1)
+            if (nextIndex == _targetIndex && (_targets.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -2020,7 +2326,7 @@ namespace AccessTheObelisk
                 _lineIndex = item.Lines.Count - 1;
             }
 
-            if (_lineIndex == previousLineIndex && item.Lines.Count > 1)
+            if (_lineIndex == previousLineIndex && (item.Lines.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -2148,7 +2454,7 @@ namespace AccessTheObelisk
 
         private static bool TryAnnounceEnergyHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.E))
+            if (!IsControlPressed() || !ModInput.GetKeyDown(KeyCode.E))
             {
                 return false;
             }
@@ -2165,7 +2471,14 @@ namespace AccessTheObelisk
 
         private bool TryAnnounceCharacterHpHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.H))
+            if (!ModInput.GetKeyDown(KeyCode.H))
+            {
+                return false;
+            }
+
+            bool ctrl = IsControlPressed();
+            bool shift = IsShiftPressed();
+            if (!ctrl && !shift)
             {
                 return false;
             }
@@ -2176,12 +2489,21 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            if (IsShiftPressed())
+            // Ctrl+Shift+H: every hero's HP, ordered from lowest to highest.
+            if (ctrl && shift)
             {
                 AnnounceAllHeroHp(match);
                 return true;
             }
 
+            // Shift+H: only the hero whose HP is currently the lowest.
+            if (shift)
+            {
+                AnnounceLowestHeroHp(match);
+                return true;
+            }
+
+            // Ctrl+H: focused or active character.
             Character character = GetFocusedOrActiveCharacter(match);
             if (character == null)
             {
@@ -2193,9 +2515,33 @@ namespace AccessTheObelisk
             return true;
         }
 
+        private bool TryAnnounceBlockShieldHotkey(MatchManager match)
+        {
+            if (!IsControlPressed() || IsShiftPressed() || !ModInput.GetKeyDown(KeyCode.B))
+            {
+                return false;
+            }
+
+            if (match == null)
+            {
+                ScreenReader.Say(Loc.Get("combat_character_unavailable"));
+                return true;
+            }
+
+            Character character = GetFocusedOrActiveCharacter(match);
+            if (character == null)
+            {
+                ScreenReader.Say(Loc.Get("combat_character_unavailable"));
+                return true;
+            }
+
+            ScreenReader.Say(FormatCharacterBlockShield(character));
+            return true;
+        }
+
         private bool TryAnnounceFocusedEffectsHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || IsShiftPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.F))
+            if (!IsControlPressed() || IsShiftPressed() || !ModInput.GetKeyDown(KeyCode.F))
             {
                 return false;
             }
@@ -2217,9 +2563,33 @@ namespace AccessTheObelisk
             return true;
         }
 
+        private bool TryAnnounceResistancesHotkey(MatchManager match)
+        {
+            if (!IsShiftPressed() || IsControlPressed() || !ModInput.GetKeyDown(KeyCode.V))
+            {
+                return false;
+            }
+
+            if (match == null)
+            {
+                ScreenReader.Say(Loc.Get("combat_character_unavailable"));
+                return true;
+            }
+
+            Character character = GetFocusedOrActiveCharacter(match);
+            if (character == null)
+            {
+                ScreenReader.Say(Loc.Get("combat_character_unavailable"));
+                return true;
+            }
+
+            ScreenReader.Say(BuildResistanceSummary(character));
+            return true;
+        }
+
         private bool TryAnnounceEnemyIntentsHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || IsShiftPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.I))
+            if (!IsControlPressed() || IsShiftPressed() || !ModInput.GetKeyDown(KeyCode.I))
             {
                 return false;
             }
@@ -2240,7 +2610,7 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            NPC[] npcs = match.GetTeamNPC();
+            NPC[] npcs = TeamNpcs(match);
             List<string> entries = new List<string>();
             if (npcs != null)
             {
@@ -2268,7 +2638,7 @@ namespace AccessTheObelisk
 
         private static bool TryAnnounceRoundHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || IsShiftPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.R))
+            if (!IsControlPressed() || IsShiftPressed() || !ModInput.GetKeyDown(KeyCode.R))
             {
                 return false;
             }
@@ -2292,14 +2662,14 @@ namespace AccessTheObelisk
 
         private static void AnnounceAllHeroHp(MatchManager match)
         {
-            Hero[] heroes = match.GetTeamHero();
+            Hero[] heroes = TeamHeroes(match);
             if (heroes == null || heroes.Length == 0)
             {
                 ScreenReader.Say(Loc.Get("combat_party_hp_unavailable"));
                 return;
             }
 
-            List<string> entries = new List<string>();
+            List<Hero> living = new List<Hero>();
             for (int i = 0; i < heroes.Length; i++)
             {
                 Hero hero = heroes[i];
@@ -2308,16 +2678,57 @@ namespace AccessTheObelisk
                     continue;
                 }
 
-                entries.Add(FormatCharacterHp(hero));
+                living.Add(hero);
             }
 
-            if (entries.Count == 0)
+            if (living.Count == 0)
             {
                 ScreenReader.Say(Loc.Get("combat_party_hp_unavailable"));
                 return;
             }
 
+            living.Sort((a, b) => a.GetHp().CompareTo(b.GetHp()));
+
+            List<string> entries = new List<string>();
+            for (int i = 0; i < living.Count; i++)
+            {
+                entries.Add(FormatCharacterHp(living[i]));
+            }
+
             ScreenReader.Say(Loc.Get("combat_party_hp", string.Join(" ", entries.ToArray())));
+        }
+
+        private static void AnnounceLowestHeroHp(MatchManager match)
+        {
+            Hero[] heroes = TeamHeroes(match);
+            if (heroes == null || heroes.Length == 0)
+            {
+                ScreenReader.Say(Loc.Get("combat_party_hp_unavailable"));
+                return;
+            }
+
+            Hero lowest = null;
+            for (int i = 0; i < heroes.Length; i++)
+            {
+                Hero hero = heroes[i];
+                if (hero == null || hero.HeroData == null)
+                {
+                    continue;
+                }
+
+                if (lowest == null || hero.GetHp() < lowest.GetHp())
+                {
+                    lowest = hero;
+                }
+            }
+
+            if (lowest == null)
+            {
+                ScreenReader.Say(Loc.Get("combat_party_hp_unavailable"));
+                return;
+            }
+
+            ScreenReader.Say(FormatCharacterHp(lowest));
         }
 
         private Character GetFocusedOrActiveCharacter(MatchManager match)
@@ -2329,14 +2740,14 @@ namespace AccessTheObelisk
             }
 
             int heroActive = match.GetHeroActive();
-            Hero[] heroes = match.GetTeamHero();
+            Hero[] heroes = TeamHeroes(match);
             if (heroActive >= 0 && heroes != null && heroActive < heroes.Length && heroes[heroActive] != null)
             {
                 return heroes[heroActive];
             }
 
             int npcActive = match.GetNPCActive();
-            NPC[] npcs = match.GetTeamNPC();
+            NPC[] npcs = TeamNpcs(match);
             if (npcActive >= 0 && npcs != null && npcActive < npcs.Length && npcs[npcActive] != null)
             {
                 return npcs[npcActive];
@@ -2350,18 +2761,23 @@ namespace AccessTheObelisk
             return Loc.Get("combat_character_hp_named", Clean(character.SourceName), character.GetHp(), character.GetMaxHP());
         }
 
+        private static string FormatCharacterBlockShield(Character character)
+        {
+            return Loc.Get("combat_character_block_shield", Clean(character.SourceName), character.GetBlock(), character.GetAuraCharges("shield"));
+        }
+
         private static string FormatCharacterEffects(Character character)
         {
             string name = Clean(character.SourceName);
-            if (character.AuraList == null || character.AuraList.Count == 0)
+            if (character.AuraCurseList == null || character.AuraCurseList.Count == 0)
             {
                 return Loc.Get("combat_character_effects_none", name);
             }
 
             List<string> effects = new List<string>();
-            for (int i = 0; i < character.AuraList.Count; i++)
+            for (int i = 0; i < character.AuraCurseList.Count; i++)
             {
-                Aura aura = character.AuraList[i];
+                AuraCurse aura = character.AuraCurseList[i];
                 if (aura == null || aura.ACData == null || aura.AuraCharges == 0)
                 {
                     continue;
@@ -2423,7 +2839,7 @@ namespace AccessTheObelisk
 
         private static bool TryAnnounceTurnOrderHotkey(MatchManager match)
         {
-            if (!IsControlPressed() || !UnityEngine.Input.GetKeyDown(KeyCode.T))
+            if (!IsControlPressed() || !ModInput.GetKeyDown(KeyCode.T))
             {
                 return false;
             }
@@ -2466,8 +2882,8 @@ namespace AccessTheObelisk
                 return order;
             }
 
-            AddFallbackTurnOrder(order, match.GetTeamHero(), true, match.GetHeroActive());
-            AddFallbackTurnOrder(order, match.GetTeamNPC(), false, match.GetNPCActive());
+            AddFallbackTurnOrder(order, TeamHeroes(match), true, match.GetHeroActive());
+            AddFallbackTurnOrder(order, TeamNpcs(match), false, match.GetNPCActive());
             order.Sort((left, right) =>
             {
                 int speed = right.Speed.CompareTo(left.Speed);
@@ -2491,31 +2907,38 @@ namespace AccessTheObelisk
 
             try
             {
-                object raw = CharOrderField.GetValue(match);
-                IEnumerable<MatchManager.CharacterForOrder> charOrder = raw as IEnumerable<MatchManager.CharacterForOrder>;
+                InitiativesManager initiatives = match != null ? match.InitiativesManager : null;
+                if (initiatives == null)
+                {
+                    return result;
+                }
+
+                object raw = CharOrderField.GetValue(initiatives);
+                IEnumerable<InitiativesManager.CharacterForOrderNew> charOrder = raw as IEnumerable<InitiativesManager.CharacterForOrderNew>;
                 if (charOrder == null)
                 {
                     return result;
                 }
 
-                foreach (MatchManager.CharacterForOrder entry in charOrder)
+                foreach (InitiativesManager.CharacterForOrderNew entry in charOrder)
                 {
                     if (entry == null)
                     {
                         continue;
                     }
 
-                    Character character = entry.hero != null ? (Character)entry.hero : entry.npc;
+                    Character character = entry.character;
                     if (character == null || !character.Alive)
                     {
                         continue;
                     }
 
+                    bool isHero = character is Hero;
                     TurnOrderItem item = new TurnOrderItem();
                     item.Name = Clean(character.SourceName);
                     item.Speed = entry.speed != null && entry.speed.Length > 0 ? entry.speed[0] : CurrentSpeed(character);
                     item.Order = entry.speedForOrder;
-                    item.Current = entry.hero != null
+                    item.Current = isHero
                         ? entry.index == match.GetHeroActive()
                         : entry.index == match.GetNPCActive();
                     item.TieIndex = entry.index;
@@ -2586,12 +3009,12 @@ namespace AccessTheObelisk
 
         private static bool IsControlPressed()
         {
-            return UnityEngine.Input.GetKey(KeyCode.LeftControl) || UnityEngine.Input.GetKey(KeyCode.RightControl);
+            return ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
         }
 
         private static bool IsShiftPressed()
         {
-            return UnityEngine.Input.GetKey(KeyCode.LeftShift) || UnityEngine.Input.GetKey(KeyCode.RightShift);
+            return ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
         }
 
         private static string GetActionSelectionTitle(MatchManager match)
@@ -2813,14 +3236,14 @@ namespace AccessTheObelisk
 
         private static bool IsCharacterEffectDescriptionLine(string line, Character character)
         {
-            if (string.IsNullOrWhiteSpace(line) || character == null || character.AuraList == null)
+            if (string.IsNullOrWhiteSpace(line) || character == null || character.AuraCurseList == null)
             {
                 return false;
             }
 
-            for (int i = 0; i < character.AuraList.Count; i++)
+            for (int i = 0; i < character.AuraCurseList.Count; i++)
             {
-                Aura aura = character.AuraList[i];
+                AuraCurse aura = character.AuraCurseList[i];
                 if (aura == null || aura.ACData == null || aura.AuraCharges == 0)
                 {
                     continue;

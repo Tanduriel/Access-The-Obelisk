@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -66,7 +66,7 @@ namespace AccessTheObelisk
                 _announced = true;
                 _index = 0;
                 _lastAlertText = text;
-                _waitForEscapeRelease = Input.GetKey(KeyCode.Escape);
+                _waitForEscapeRelease = ModInput.GetKey(KeyCode.Escape);
                 ScreenReader.Say(Loc.Get("settings_alert", text));
                 ScreenReader.SayQueued(FocusText(choices));
                 if (IsDismissOnlySingleButtonAlert(alert, choices))
@@ -92,7 +92,7 @@ namespace AccessTheObelisk
 
             if (_waitForEscapeRelease)
             {
-                if (Input.GetKey(KeyCode.Escape))
+                if (ModInput.GetKey(KeyCode.Escape))
                 {
                     return true;
                 }
@@ -100,31 +100,31 @@ namespace AccessTheObelisk
                 _waitForEscapeRelease = false;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(choices, -1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(choices, 1);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(choices, false);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(choices, true);
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 if (choices.Count == 0)
                 {
@@ -156,7 +156,7 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 alert.CloseAlert();
                 Reset();
@@ -175,7 +175,7 @@ namespace AccessTheObelisk
             {
                 _announced = true;
                 _lastAlertText = text;
-                _waitForEscapeRelease = Input.GetKey(KeyCode.Escape);
+                _waitForEscapeRelease = ModInput.GetKey(KeyCode.Escape);
                 ScreenReader.Say(text);
                 ScreenReader.SayQueued(Loc.Get("alert_copy_controls"));
                 ClearFocus();
@@ -187,7 +187,7 @@ namespace AccessTheObelisk
 
             if (_waitForEscapeRelease)
             {
-                if (Input.GetKey(KeyCode.Escape))
+                if (ModInput.GetKey(KeyCode.Escape))
                 {
                     return true;
                 }
@@ -195,15 +195,15 @@ namespace AccessTheObelisk
                 _waitForEscapeRelease = false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.C))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.C))
             {
                 GUIUtility.systemCopyBuffer = alert.alertInputCP != null ? alert.alertInputCP.text : "";
                 ScreenReader.Say(Loc.Get("alert_copy_done"));
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space) || ModInput.GetKeyDown(KeyCode.Escape))
             {
                 AlertManager.buttonClickDelegate = null;
                 alert.HideAlert();
@@ -222,7 +222,7 @@ namespace AccessTheObelisk
             {
                 _announced = true;
                 _lastAlertText = text;
-                _waitForEscapeRelease = Input.GetKey(KeyCode.Escape);
+                _waitForEscapeRelease = ModInput.GetKey(KeyCode.Escape);
                 ScreenReader.Say(Loc.Get("settings_alert_input", text));
                 ScreenReader.SayQueued(Loc.Get("alert_paste_controls"));
                 FocusPasteInput(alert);
@@ -234,7 +234,7 @@ namespace AccessTheObelisk
 
             if (_waitForEscapeRelease)
             {
-                if (Input.GetKey(KeyCode.Escape))
+                if (ModInput.GetKey(KeyCode.Escape))
                 {
                     return true;
                 }
@@ -242,8 +242,8 @@ namespace AccessTheObelisk
                 _waitForEscapeRelease = false;
             }
 
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.V))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.V))
             {
                 if (alert.alertInputPC != null)
                 {
@@ -256,7 +256,7 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 if (alert.alertInputPC == null || string.IsNullOrWhiteSpace(alert.alertInputPC.text))
                 {
@@ -270,7 +270,7 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 AlertManager.buttonClickDelegate = null;
                 alert.HideAlert();
@@ -289,13 +289,13 @@ namespace AccessTheObelisk
             {
                 _announced = true;
                 _lastAlertText = text;
-                _waitForEscapeRelease = Input.GetKey(KeyCode.Escape);
+                _waitForEscapeRelease = ModInput.GetKey(KeyCode.Escape);
                 ScreenReader.Say(Loc.Get("settings_alert_input", text));
             }
 
             if (_waitForEscapeRelease)
             {
-                if (Input.GetKey(KeyCode.Escape))
+                if (ModInput.GetKey(KeyCode.Escape))
                 {
                     return true;
                 }
@@ -303,7 +303,7 @@ namespace AccessTheObelisk
                 _waitForEscapeRelease = false;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 if (alert.alertInput == null || string.IsNullOrWhiteSpace(alert.alertInput.text))
                 {
@@ -317,7 +317,7 @@ namespace AccessTheObelisk
                 return true;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 alert.CloseAlert();
                 Reset();

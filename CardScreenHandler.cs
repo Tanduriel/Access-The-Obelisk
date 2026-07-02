@@ -3,6 +3,8 @@ using HarmonyLib;
 using System.Reflection;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -11,9 +13,9 @@ namespace AccessTheObelisk
     public sealed class CardScreenHandler
     {
         private static readonly FieldInfo CardDataField = AccessTools.Field(typeof(CardScreenManager), "cardData");
-        private static CardData _openedCardData;
+        private static CardRealtimeData _openedCardData;
         private readonly List<string> _lines = new List<string>();
-        private CardData _activeCardData;
+        private CardRealtimeData _activeCardData;
         private int _lineIndex;
         private int _focusIndex;
         private bool _announced;
@@ -21,7 +23,7 @@ namespace AccessTheObelisk
         /// <summary>
         /// Opens the native card detail screen and prepares accessible speech for it.
         /// </summary>
-        public static void Open(CardData cardData)
+        public static void Open(CardRealtimeData cardData)
         {
             if (cardData == null || CardScreenManager.Instance == null)
             {
@@ -34,7 +36,7 @@ namespace AccessTheObelisk
             CardScreenManager.Instance.SetCardData(cardData);
         }
 
-        internal static void TrackNativeCardData(CardData cardData)
+        internal static void TrackNativeCardData(CardRealtimeData cardData)
         {
             if (cardData != null)
             {
@@ -54,7 +56,7 @@ namespace AccessTheObelisk
             }
 
             AccessStateManager.SetState(AccessState.CardScreen);
-            CardData currentCardData = ReadCurrentCardData();
+            CardRealtimeData currentCardData = ReadCurrentCardData();
             if (_activeCardData != currentCardData)
             {
                 Rebuild(currentCardData);
@@ -65,18 +67,18 @@ namespace AccessTheObelisk
             return true;
         }
 
-        private static CardData ReadCurrentCardData()
+        private static CardRealtimeData ReadCurrentCardData()
         {
             if (CardScreenManager.Instance == null)
             {
                 return _openedCardData;
             }
 
-            CardData managerData = CardDataField != null ? CardDataField.GetValue(CardScreenManager.Instance) as CardData : null;
+            CardRealtimeData managerData = CardDataField != null ? CardDataField.GetValue(CardScreenManager.Instance) as CardRealtimeData : null;
             return managerData ?? _openedCardData;
         }
 
-        private void Rebuild(CardData cardData)
+        private void Rebuild(CardRealtimeData cardData)
         {
             _activeCardData = cardData;
             _lines.Clear();
@@ -123,44 +125,44 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow) || ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.Home))
             {
                 MoveFocus(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow) || ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.End))
             {
                 MoveFocus(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 if (_focusIndex == 1)
                 {
@@ -174,7 +176,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (ModInput.GetKeyDown(KeyCode.Escape))
             {
                 CloseCardScreen();
             }
@@ -264,7 +266,7 @@ namespace AccessTheObelisk
     [HarmonyPatch(typeof(CardScreenManager), "SetCardData")]
     internal static class CardScreenManagerSetCardDataPatch
     {
-        private static void Prefix(CardData _cardData)
+        private static void Prefix(CardRealtimeData _cardData)
         {
             CardScreenHandler.TrackNativeCardData(_cardData);
         }

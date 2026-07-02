@@ -48,7 +48,7 @@ namespace AccessTheObelisk
         /// </summary>
         public static bool IsSubmitHeld()
         {
-            return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter) || Input.GetKey(KeyCode.Space);
+            return ModInput.GetKey(KeyCode.Return) || ModInput.GetKey(KeyCode.KeypadEnter) || ModInput.GetKey(KeyCode.Space);
         }
     }
 }

@@ -1,8 +1,27 @@
 Unreleased
 
+
+V 0.5
+
+The mod is now compatible with game version 1.7.6. Older game versions are no longer supported due to significant changes in the game's code.
+Added full gamepad support, including navigation and reading of on-screen information.
+The Credits screen and the DLC info screen are now announced correctly.
+On the hero selection screen, pressing ctrl+enter on a hero now opens the full hero screen (stats, rank, customization, perks, and so on) instead of just the perk tree.
+Added a mod setting to disable repeating the announcement of a list's only item when navigating it.
+Added the ability to view vulnerabilities and resistances of heroes and enemies, both in a separate buffer and via hotkey.
+Added a mod setting to enable or disable announcing effects removed from a target upon its death.
+Added new hotkeys: ctrl+b announces the target's block and shield, shift+h announces the hero with the lowest health, ctrl+shift+h announces the health of all heroes in the party from lowest to highest, and shift+v announces the target's vulnerabilities and resistances.
+Fixed incorrect round number announcement.
+Added chat support for multiplayer: / to type a message, [ and ] to browse message history.
+Added a Players menu (p key) to check each player's ping or mute individual players.
+Added additional hints during co-op play to make it easier to follow what's happening.
+The on-screen keyboard is now announced for gamepad users.
+Fixed all currently known multiplayer bugs.
 Improved the Obelisk Challenge start screen.
 Fixed localization loading after the installer/release structure change. The mod now finds txt localization files both when installed in BepInEx\plugins\AccessTheObelisk\Localization and when using the previous legacy layout.
-No GitHub release has been created for this change yet.
+Updated the Russian localization package for the latest game version; it is still updated separately from the mod via the AccessTheObelisk installer.
+Updated the Russian and English readmes, including the full hotkey list and gamepad controls.
+Other minor fixes.
 
 
 V 0.3.5

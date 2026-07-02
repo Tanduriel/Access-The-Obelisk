@@ -1,9 +1,11 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TMPro;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -17,6 +19,8 @@ namespace AccessTheObelisk
             public string RewardChoice;
             public bool ToggleAccepted;
             public bool Continue;
+            public bool IsCorruptionCard;
+            public bool HasCardData;
             public readonly List<string> Lines = new List<string>();
         }
 
@@ -88,21 +92,37 @@ namespace AccessTheObelisk
         private void AddCorruptionCard(CorruptionManager corruption)
         {
             CorruptionItem item = new CorruptionItem();
+            item.IsCorruptionCard = true;
             AddLine(item, Loc.Get("corruption_screen"));
-            AddLine(item, Clean(corruption.textDifficulty != null ? corruption.textDifficulty.text : ""));
-            AddLine(item, Clean(corruption.textAcceptScore != null ? corruption.textAcceptScore.text : ""));
 
-            CardData data = AtOManager.Instance != null && !string.IsNullOrWhiteSpace(AtOManager.Instance.corruptionIdCard)
+            CardRealtimeData data = AtOManager.Instance != null && !string.IsNullOrWhiteSpace(AtOManager.Instance.corruptionIdCard)
                 ? Globals.Instance.GetCardData(AtOManager.Instance.corruptionIdCard, instantiate: false)
                 : null;
             if (data != null)
             {
+                item.HasCardData = true;
+                AddLine(item, CorruptionDifficulty(data));
                 AddLine(item, Clean(data.CardName));
-                AddLine(item, Loc.Get("combat_card_description", Clean(!string.IsNullOrWhiteSpace(data.DescriptionNormalized) ? data.DescriptionNormalized : data.Description)));
+                AddLine(item, Loc.Get("combat_card_description", Clean(data.DescriptionNormalized)));
             }
 
             item.Summary = string.Join(" ", item.Lines.ToArray());
             _items.Add(item);
+        }
+
+        private static string CorruptionDifficulty(CardRealtimeData data)
+        {
+            switch (data.CardRarity)
+            {
+                case Enums.CardRarity.Common:
+                    return Loc.Get("corruption_difficulty_easy");
+                case Enums.CardRarity.Uncommon:
+                    return Loc.Get("corruption_difficulty_average");
+                case Enums.CardRarity.Rare:
+                    return Loc.Get("corruption_difficulty_hard");
+                default:
+                    return Loc.Get("corruption_difficulty_extreme");
+            }
         }
 
         private void AddReward(CorruptionManager corruption, string choice, BotonGeneric button)
@@ -175,14 +195,14 @@ namespace AccessTheObelisk
                 return;
             }
 
-            CardData rewardCard = Globals.Instance.GetCardData(AtOManager.Instance.corruptionRewardCard, instantiate: false);
+            CardRealtimeData rewardCard = Globals.Instance.GetCardData(AtOManager.Instance.corruptionRewardCard, instantiate: false);
             if (rewardCard == null)
             {
                 return;
             }
 
             string heroName = "";
-            Hero[] team = AtOManager.Instance.GetTeam();
+            Hero[] team = AtOManager.Instance.team.heroes.ToArray();
             int heroIndex = AtOManager.Instance.corruptionRewardChar;
             if (team != null && heroIndex >= 0 && heroIndex < team.Length && team[heroIndex] != null)
             {
@@ -192,7 +212,7 @@ namespace AccessTheObelisk
             AddLine(item, string.IsNullOrWhiteSpace(heroName)
                 ? Loc.Get("corruption_reward_card", Clean(rewardCard.CardName))
                 : Loc.Get("corruption_reward_card_for_hero", Clean(rewardCard.CardName), Clean(heroName)));
-            List<string> cardLines = CardSpeech.BuildCardLines(rewardCard, rewardCard.EnergyCost);
+            List<string> cardLines = CardSpeech.BuildDetailLines(rewardCard, rewardCard.EnergyCost);
             for (int i = 0; i < cardLines.Count; i++)
             {
                 AddLine(item, cardLines[i]);
@@ -235,6 +255,14 @@ namespace AccessTheObelisk
                 return;
             }
 
+            // Wait until the corruption card data has loaded so we announce the actual
+            // condition (card name and description) instead of the raw difficulty text.
+            CorruptionItem first = _items.Count > 0 ? _items[0] : null;
+            if (first != null && first.IsCorruptionCard && !first.HasCardData)
+            {
+                return;
+            }
+
             _announced = true;
             ScreenReader.Say(Loc.Get("corruption_screen"));
             AnnounceFocused(true);
@@ -242,56 +270,56 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(CorruptionManager corruption)
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 ReadLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 ReadLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow) || ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow) || ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(corruption);
             }

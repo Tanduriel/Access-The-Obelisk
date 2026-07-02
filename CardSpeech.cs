@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     internal static class CardSpeech
     {
-        internal static List<string> BuildCardLines(CardData data, int energyCost)
+        internal static List<string> BuildCardLines(CardRealtimeData data, int energyCost)
         {
             List<string> lines = new List<string>();
             if (data == null)
@@ -17,15 +19,15 @@ namespace AccessTheObelisk
             AddLine(lines, RequirementLine(data));
             AddLine(lines, Loc.Get("combat_card_type", GameText.CardTypeName(data.CardType)));
             AddLine(lines, Loc.Get("combat_card_target", Clean(data.Target)));
-            AddCardNumberLine(lines, "combat_card_damage", data.DamagePreCalculated, data.Damage);
-            AddCardNumberLine(lines, "combat_card_heal", data.Heal, 0);
+            AddCardNumberLine(lines, "combat_card_damage", DamageValue(data), 0);
+            AddCardNumberLine(lines, "combat_card_heal", HealValue(data), 0);
             AddLine(lines, Loc.Get("combat_card_description", Description(data)));
             AddLine(lines, Fluff(data));
             AddCardEffects(lines, data);
             return lines;
         }
 
-        internal static string BuildCardFocusSummary(CardData data, int energyCost)
+        internal static string BuildCardFocusSummary(CardRealtimeData data, int energyCost)
         {
             if (data == null)
             {
@@ -52,7 +54,45 @@ namespace AccessTheObelisk
             return Loc.Get("combat_card_focus_summary", CardNameWithRarity(data), energyCost, GameText.CardTypeName(data.CardType), Clean(data.Target), description);
         }
 
-        internal static List<string> BuildItemOverviewLines(CardData data)
+        /// <summary>
+        /// Returns true when the card represents an equippable item, pet, or enchantment
+        /// whose stat effects should be read instead of plain combat card lines.
+        /// </summary>
+        internal static bool IsItem(CardRealtimeData data)
+        {
+            return data != null && (data.CardClass == Enums.CardClass.Item || data.Item != null || data.ItemEnchantment != null);
+        }
+
+        /// <summary>
+        /// Builds the full detail line list for a card or item, choosing item overview plus
+        /// effect lines for equipment and plain combat card lines otherwise.
+        /// </summary>
+        internal static List<string> BuildDetailLines(CardRealtimeData data, int energyCost)
+        {
+            if (!IsItem(data))
+            {
+                return BuildCardLines(data, energyCost);
+            }
+
+            List<string> lines = BuildItemOverviewLines(data);
+            List<string> effectLines = BuildItemEffectLines(data);
+            for (int i = 1; i < effectLines.Count; i++)
+            {
+                AddLine(lines, effectLines[i]);
+            }
+
+            return lines;
+        }
+
+        /// <summary>
+        /// Builds the focus summary for a card or item, choosing the item summary for equipment.
+        /// </summary>
+        internal static string BuildDetailSummary(CardRealtimeData data, int energyCost)
+        {
+            return IsItem(data) ? BuildItemFocusSummary(data) : BuildCardFocusSummary(data, energyCost);
+        }
+
+        internal static List<string> BuildItemOverviewLines(CardRealtimeData data)
         {
             List<string> lines = new List<string>();
             if (data == null)
@@ -68,7 +108,7 @@ namespace AccessTheObelisk
             return lines;
         }
 
-        internal static List<string> BuildItemEffectLines(CardData data)
+        internal static List<string> BuildItemEffectLines(CardRealtimeData data)
         {
             List<string> lines = new List<string>();
             if (data == null)
@@ -84,7 +124,7 @@ namespace AccessTheObelisk
             return lines;
         }
 
-        internal static string BuildItemFocusSummary(CardData data)
+        internal static string BuildItemFocusSummary(CardRealtimeData data)
         {
             if (data == null)
             {
@@ -100,7 +140,7 @@ namespace AccessTheObelisk
             return Loc.Get("item_focus_summary", CardNameWithRarity(data), GameText.CardTypeName(data.CardType), description);
         }
 
-        internal static string CardNameWithRarity(CardData data)
+        internal static string CardNameWithRarity(CardRealtimeData data)
         {
             if (data == null)
             {
@@ -110,35 +150,97 @@ namespace AccessTheObelisk
             return Loc.Get("card_name_with_rarity", Clean(GameText.CardName(data)), GameText.CardRarityName(data.CardRarity));
         }
 
-        private static string Description(CardData data)
+        private static string Description(CardRealtimeData data)
         {
             if (data == null)
             {
                 return "";
             }
 
-            if (string.IsNullOrWhiteSpace(data.DescriptionNormalized))
+            return Clean(data.DescriptionNormalized);
+        }
+
+        /// <summary>
+        /// Resolves the runtime card for a card definition, returning null when it cannot be built.
+        /// Used where the game now exposes a <see cref="CardDataNew"/> definition but a runtime card is needed.
+        /// </summary>
+        internal static CardRealtimeData Resolve(CardDataNew card)
+        {
+            return card != null && Globals.Instance != null
+                ? Globals.Instance.GetCardData(card.Id, instantiate: false)
+                : null;
+        }
+
+        /// <summary>
+        /// Returns the precalculated damage dealt to the primary target, falling back to the
+        /// base damage value when precalculated effects are not available.
+        /// </summary>
+        internal static int DamageValue(CardRealtimeData data)
+        {
+            if (data == null || !data.HasDamage)
             {
-                try
+                return 0;
+            }
+
+            List<DamageEffectData> effects = data.DamageMergedPrecalculated != null && data.DamageMergedPrecalculated.Count > 0
+                ? data.DamageMergedPrecalculated
+                : data.DamageOriginal;
+            if (effects == null)
+            {
+                return 0;
+            }
+
+            int anyDamage = 0;
+            foreach (DamageEffectData effect in effects)
+            {
+                if (effect == null)
                 {
-                    data.SetDescriptionNew(false, null, false);
+                    continue;
                 }
-                catch (System.Exception ex)
+
+                if (anyDamage == 0)
                 {
-                    DebugLogger.LogState("Could not build card description for " + data.Id + ": " + ex.Message);
+                    anyDamage = effect.Damage;
+                }
+
+                if (effect.DamageTarget == DamageTarget.Target)
+                {
+                    return effect.Damage;
                 }
             }
 
-            return Clean(!string.IsNullOrWhiteSpace(data.DescriptionNormalized) ? data.DescriptionNormalized : data.Description);
+            return anyDamage;
         }
 
-        private static string RequirementLine(CardData data)
+        /// <summary>
+        /// Returns the total healing performed by the card across all heal effects.
+        /// </summary>
+        internal static int HealValue(CardRealtimeData data)
+        {
+            if (data == null || data.Heal == null || !data.Heal.HasHeal || data.Heal.HealEffects == null)
+            {
+                return 0;
+            }
+
+            int total = 0;
+            foreach (HealEffectData effect in data.Heal.HealEffects)
+            {
+                if (effect != null)
+                {
+                    total += effect.Heal;
+                }
+            }
+
+            return total;
+        }
+
+        private static string RequirementLine(CardRealtimeData data)
         {
             string requirement = Requirement(data);
             return string.IsNullOrWhiteSpace(requirement) ? string.Empty : Loc.Get("combat_card_requirement", requirement);
         }
 
-        private static string Requirement(CardData data)
+        private static string Requirement(CardRealtimeData data)
         {
             if (data == null || string.IsNullOrWhiteSpace(data.EffectRequired))
             {
@@ -156,7 +258,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static string Fluff(CardData data)
+        private static string Fluff(CardRealtimeData data)
         {
             if (data == null)
             {
@@ -176,20 +278,34 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddCardEffects(List<string> lines, CardData data)
+        private static void AddCardEffects(List<string> lines, CardRealtimeData data)
         {
-            AddCardEffect(lines, data.Aura, data.AuraCharges);
-            AddCardEffect(lines, data.AuraSelf, data.AuraCharges);
-            AddCardEffect(lines, data.Aura2, data.AuraCharges2);
-            AddCardEffect(lines, data.AuraSelf2, data.AuraCharges2);
-            AddCardEffect(lines, data.Aura3, data.AuraCharges3);
-            AddCardEffect(lines, data.AuraSelf3, data.AuraCharges3);
-            AddCardEffect(lines, data.Curse, data.CurseCharges);
-            AddCardEffect(lines, data.CurseSelf, data.CurseCharges);
-            AddCardEffect(lines, data.Curse2, data.CurseCharges2);
-            AddCardEffect(lines, data.CurseSelf2, data.CurseCharges2);
-            AddCardEffect(lines, data.Curse3, data.CurseCharges3);
-            AddCardEffect(lines, data.CurseSelf3, data.CurseCharges3);
+            if (data == null)
+            {
+                return;
+            }
+
+            if (data.Auras != null && data.Auras.Auras != null)
+            {
+                foreach (AuraEffectData aura in data.Auras.Auras)
+                {
+                    if (aura != null)
+                    {
+                        AddCardEffect(lines, aura.Aura, aura.Charges);
+                    }
+                }
+            }
+
+            if (data.Curses != null)
+            {
+                foreach (CurseEffectData curse in data.Curses)
+                {
+                    if (curse != null)
+                    {
+                        AddCardEffect(lines, curse.Curse, curse.Charges);
+                    }
+                }
+            }
         }
 
         private static void AddCardEffect(List<string> lines, AuraCurseData effect, int charges)
@@ -312,6 +428,16 @@ namespace AccessTheObelisk
             }
         }
 
+        private static void AddPetCardLines(List<string> lines, CardDataNew card)
+        {
+            if (card == null || Globals.Instance == null)
+            {
+                return;
+            }
+
+            AddPetCardLines(lines, Globals.Instance.GetCardData(card.Id, instantiate: false));
+        }
+
         private static void AddPetCardLines(List<string> lines, ItemData item)
         {
             if (item.PetActivation == Enums.ActivePets.Self || item.PetActivation == Enums.ActivePets.AllTeam)
@@ -331,7 +457,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddPetCardLines(List<string> lines, CardData card)
+        private static void AddPetCardLines(List<string> lines, CardRealtimeData card)
         {
             if (card == null)
             {

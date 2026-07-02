@@ -163,43 +163,43 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(GiveManager give)
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 Adjust(give, -1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 Adjust(give, 1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(give);
             }
@@ -236,7 +236,7 @@ namespace AccessTheObelisk
             switch (item.Kind)
             {
             case GiveItemKind.Resource:
-                give.ShowGive(true, IsGold(give) ? 1 : 0);
+                give.ShowGive(true, IsGold(give) ? Enums.CurrencyType.GOLD : Enums.CurrencyType.DUST);
                 break;
             case GiveItemKind.Target:
                 if (delta < 0)
@@ -349,8 +349,8 @@ namespace AccessTheObelisk
 
         private static int QuantityStep()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
-            bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
+            bool shift = ModInput.GetKey(KeyCode.LeftShift) || ModInput.GetKey(KeyCode.RightShift);
             if (ctrl)
             {
                 return 100;
@@ -371,7 +371,7 @@ namespace AccessTheObelisk
 
         private static string QuantityText(GiveManager give)
         {
-            int available = IsGold(give) ? AtOManager.Instance.GetPlayerGold() : AtOManager.Instance.GetPlayerDust();
+            int available = IsGold(give) ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : AtOManager.Instance.CurrencyManager.GetPlayerDust();
             return Loc.Get("give_quantity", give.quantity, available);
         }
 

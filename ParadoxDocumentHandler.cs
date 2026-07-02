@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
@@ -83,43 +83,43 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(MainMenuManager menu)
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(menu, -1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(menu, 1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 Move(menu, -5);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 Move(menu, 5);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(menu, false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(menu, true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter) || ModInput.GetKeyDown(KeyCode.Space))
             {
                 Activate(menu);
             }
@@ -134,7 +134,7 @@ namespace AccessTheObelisk
             }
 
             int nextIndex = Clamp(_index + delta, 0, _lines.Count - 1);
-            if (nextIndex == _index && _lines.Count > 1)
+            if (nextIndex == _index && (_lines.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -154,7 +154,7 @@ namespace AccessTheObelisk
             }
 
             int nextIndex = end ? _lines.Count - 1 : 0;
-            if (nextIndex == _index && _lines.Count > 1)
+            if (nextIndex == _index && (_lines.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }

@@ -1,9 +1,11 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -22,7 +24,7 @@ namespace AccessTheObelisk
             public bool LoadSavedDeck;
             public bool CraftSavedDeck;
             public int SaveDeckSlot = -1;
-            public CardData CardData;
+            public CardRealtimeData CardData;
             public ItemCombatIcon ItemIcon;
             public TMPro.TMP_InputField SearchInput;
             public readonly List<string> Lines = new List<string>();
@@ -43,7 +45,6 @@ namespace AccessTheObelisk
         }
 
         private static readonly FieldInfo CraftCardItemDictField = AccessTools.Field(typeof(CardCraftManager), "craftCardItemDict");
-        private static readonly FieldInfo HeroIndexField = AccessTools.Field(typeof(CardCraftManager), "heroIndex");
         private static readonly FieldInfo CostAField = AccessTools.Field(typeof(CardCraftManager), "costA");
         private static readonly FieldInfo CostBField = AccessTools.Field(typeof(CardCraftManager), "costB");
         private static readonly FieldInfo CostRemoveField = AccessTools.Field(typeof(CardCraftManager), "costRemove");
@@ -411,7 +412,6 @@ namespace AccessTheObelisk
             AddArmoryEquippedItem(craft.iconAccesory, Loc.Get("character_item_accessory"));
             AddArmoryEquippedItem(craft.iconPet, Loc.Get("character_item_pet"));
             AddArmoryShadyDeal(craft);
-            AddGiveGold(craft);
             AddPageButtons(craft.itemsCraftPageContainer);
         }
 
@@ -429,7 +429,7 @@ namespace AccessTheObelisk
             string text = Clean(button.GetText());
             AddLine(item, string.IsNullOrWhiteSpace(text) ? Loc.Get("armory_reroll") : text);
             int cost = Globals.Instance != null ? Globals.Instance.GetCostReroll() : -1;
-            int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+            int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
             if (cost >= 0)
             {
                 AddLine(item, gold >= cost ? Loc.Get("armory_reroll_cost", cost, gold) : Loc.Get("armory_reroll_not_enough_gold", cost, gold));
@@ -461,7 +461,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            CardData data = ItemIconCardDataField != null ? ItemIconCardDataField.GetValue(icon) as CardData : null;
+            CardRealtimeData data = ItemIconCardDataField != null ? ItemIconCardDataField.GetValue(icon) as CardRealtimeData : null;
             if (data == null)
             {
                 return;
@@ -636,7 +636,7 @@ namespace AccessTheObelisk
             return item;
         }
 
-        private static void AddUpgradeBuffers(CraftItem item, CardData data)
+        private static void AddUpgradeBuffers(CraftItem item, CardRealtimeData data)
         {
             if (data == null)
             {
@@ -666,7 +666,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddCardBuffer(CraftItem item, string name, CardData data, string upgradeType, CardData compareTo = null)
+        private static void AddCardBuffer(CraftItem item, string name, CardRealtimeData data, string upgradeType, CardRealtimeData compareTo = null)
         {
             if (data == null)
             {
@@ -683,7 +683,7 @@ namespace AccessTheObelisk
             item.Buffers.Add(buffer);
         }
 
-        private static void AddUpgradeDifferenceLines(CardBuffer buffer, CardData baseData, CardData upgradeData)
+        private static void AddUpgradeDifferenceLines(CardBuffer buffer, CardRealtimeData baseData, CardRealtimeData upgradeData)
         {
             if (baseData == null || upgradeData == null)
             {
@@ -692,8 +692,8 @@ namespace AccessTheObelisk
 
             List<string> changes = new List<string>();
             AddChange(changes, Loc.Get("craft_change_cost"), baseData.EnergyCost.ToString(), upgradeData.EnergyCost.ToString());
-            AddChange(changes, Loc.Get("craft_change_damage"), CardNumber(baseData.DamagePreCalculated, baseData.Damage), CardNumber(upgradeData.DamagePreCalculated, upgradeData.Damage));
-            AddChange(changes, Loc.Get("craft_change_heal"), baseData.Heal.ToString(), upgradeData.Heal.ToString());
+            AddChange(changes, Loc.Get("craft_change_damage"), CardNumber(CardSpeech.DamageValue(baseData), 0), CardNumber(CardSpeech.DamageValue(upgradeData), 0));
+            AddChange(changes, Loc.Get("craft_change_heal"), CardSpeech.HealValue(baseData).ToString(), CardSpeech.HealValue(upgradeData).ToString());
             AddChange(changes, Loc.Get("craft_change_type"), GameText.CardTypeName(baseData.CardType), GameText.CardTypeName(upgradeData.CardType));
             AddChange(changes, Loc.Get("craft_change_target"), Clean(baseData.Target), Clean(upgradeData.Target));
             AddChange(changes, Loc.Get("card_rarity_label"), GameText.CardRarityName(baseData.CardRarity), GameText.CardRarityName(upgradeData.CardRarity));
@@ -726,7 +726,7 @@ namespace AccessTheObelisk
             return value.ToString();
         }
 
-        private static string UpgradeDescription(CardData data)
+        private static string UpgradeDescription(CardRealtimeData data)
         {
             List<string> lines = CardSpeech.BuildCardLines(data, data.EnergyCost);
             for (int i = 0; i < lines.Count; i++)
@@ -839,7 +839,7 @@ namespace AccessTheObelisk
 
         private static CraftItem BuildCraftCard(CardCraftItem card)
         {
-            CardData data = Globals.Instance.GetCardData(card.cardId, instantiate: false);
+            CardRealtimeData data = Globals.Instance.GetCardData(card.cardId, instantiate: false);
             if (data == null)
             {
                 return null;
@@ -906,7 +906,7 @@ namespace AccessTheObelisk
             if (craft != null && card.Available && !card.Enabled)
             {
                 int cost = CraftCost(craft, card.cardId);
-                int dust = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerDust() : 0;
+                int dust = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerDust() : 0;
                 if (cost > dust)
                 {
                     AddLine(item, Loc.Get("craft_not_enough_dust", cost, dust));
@@ -922,7 +922,7 @@ namespace AccessTheObelisk
             }
 
             int cost = CraftCost(craft, card.cardId);
-            int dust = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerDust() : 0;
+            int dust = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerDust() : 0;
             if (cost > dust)
             {
                 return Loc.Get("craft_not_enough_dust", cost, dust);
@@ -949,7 +949,7 @@ namespace AccessTheObelisk
                 return Loc.Get("craft_card_cost_free");
             }
 
-            int dust = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerDust() : 0;
+            int dust = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerDust() : 0;
             return includeDust ? Loc.Get("craft_card_cost_with_dust", cost, dust) : Loc.Get("craft_card_cost", cost);
         }
 
@@ -975,7 +975,7 @@ namespace AccessTheObelisk
 
         private static CraftItem BuildShopItem(CardCraftItem card)
         {
-            CardData data = Globals.Instance.GetCardData(card.cardId, instantiate: false);
+            CardRealtimeData data = Globals.Instance.GetCardData(card.cardId, instantiate: false);
             if (data == null)
             {
                 return null;
@@ -1012,7 +1012,7 @@ namespace AccessTheObelisk
             return item;
         }
 
-        private static void AddArmoryItemCostLines(CraftItem item, CardCraftItem card, CardData data)
+        private static void AddArmoryItemCostLines(CraftItem item, CardCraftItem card, CardRealtimeData data)
         {
             string text = ArmoryItemCostText(CardCraftManager.Instance, data, includeGold: true);
             if (!string.IsNullOrWhiteSpace(text))
@@ -1023,7 +1023,7 @@ namespace AccessTheObelisk
             if (card != null && card.Available && !card.Enabled)
             {
                 int cost = ArmoryItemCost(CardCraftManager.Instance, data);
-                int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+                int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
                 if (cost > gold)
                 {
                     AddLine(item, Loc.Get("armory_not_enough_gold", cost, gold));
@@ -1031,7 +1031,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddArmoryItemAvailabilityLines(CraftItem item, CardCraftItem card, CardData data)
+        private static void AddArmoryItemAvailabilityLines(CraftItem item, CardCraftItem card, CardRealtimeData data)
         {
             if (card == null)
             {
@@ -1046,7 +1046,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static string ArmoryItemCostText(CardCraftManager craft, CardData data, bool includeGold)
+        private static string ArmoryItemCostText(CardCraftManager craft, CardRealtimeData data, bool includeGold)
         {
             int cost = ArmoryItemCost(craft, data);
             if (cost < 0 || cost >= 1000000)
@@ -1059,11 +1059,11 @@ namespace AccessTheObelisk
                 return Loc.Get("armory_item_cost_free");
             }
 
-            int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+            int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
             return includeGold ? Loc.Get("armory_item_cost_with_gold", cost, gold) : Loc.Get("armory_item_cost", cost);
         }
 
-        private static int ArmoryItemCost(CardCraftManager craft, CardData data)
+        private static int ArmoryItemCost(CardCraftManager craft, CardRealtimeData data)
         {
             if (craft == null || data == null || SetPriceMethod == null)
             {
@@ -1090,7 +1090,7 @@ namespace AccessTheObelisk
                 ?? Loc.Get("menu_item_unavailable", item != null ? item.Summary : Loc.Get("craft_no_item"));
         }
 
-        private static string ArmoryUnavailableReason(CardCraftManager craft, CraftItem item, CardCraftItem card, CardData data)
+        private static string ArmoryUnavailableReason(CardCraftManager craft, CraftItem item, CardCraftItem card, CardRealtimeData data)
         {
             if (item == null)
             {
@@ -1115,14 +1115,14 @@ namespace AccessTheObelisk
                     return Loc.Get("armory_pet_locked");
                 }
 
-                if (AtOManager.Instance != null && AtOManager.Instance.TeamHaveItem(data.Id, 5, true))
+                if (AtOManager.Instance != null && AtOManager.Instance.team.TeamHaveItem(data.Id, 5, true))
                 {
                     return Loc.Get("armory_pet_already_owned");
                 }
             }
 
             int cost = ArmoryItemCost(craft, item.CardData);
-            int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+            int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
             if (cost > gold && cost < 1000000)
             {
                 return Loc.Get("armory_not_enough_gold", cost, gold);
@@ -1170,7 +1170,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddItemEffectBuffer(CraftItem item, CardData data)
+        private static void AddItemEffectBuffer(CraftItem item, CardRealtimeData data)
         {
             CardBuffer buffer = new CardBuffer();
             buffer.Name = Loc.Get("item_effects");
@@ -1181,7 +1181,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddItemOverviewBuffer(CraftItem item, CardData data)
+        private static void AddItemOverviewBuffer(CraftItem item, CardRealtimeData data)
         {
             CardBuffer buffer = new CardBuffer();
             buffer.Name = Loc.Get("item_overview");
@@ -1280,12 +1280,12 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddCardDataLines(CraftItem item, CardData data)
+        private static void AddCardDataLines(CraftItem item, CardRealtimeData data)
         {
             item.Lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
         }
 
-        private static void AddCardDataLines(CardBuffer buffer, CardData data)
+        private static void AddCardDataLines(CardBuffer buffer, CardRealtimeData data)
         {
             buffer.Lines.AddRange(CardSpeech.BuildCardLines(data, data.EnergyCost));
         }
@@ -1325,94 +1325,94 @@ namespace AccessTheObelisk
 
         private void ProcessKeys()
         {
-            bool ctrl = Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
             bool saveLoadOpen = IsSaveLoadOpen(CardCraftManager.Instance);
             bool hasBuffers = CardCraftManager.Instance != null && (CardCraftManager.Instance.craftType == 0 || CardCraftManager.Instance.craftType == 4);
-            if (ctrl && Input.GetKeyDown(KeyCode.UpArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 MoveLine(1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.DownArrow))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 MoveLine(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.Home))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpLine(false);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.End))
+            if (ctrl && ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpLine(true);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.LeftArrow) && hasBuffers)
+            if (ctrl && ModInput.GetKeyDown(KeyCode.LeftArrow) && hasBuffers)
             {
                 MoveBuffer(-1);
                 return;
             }
 
-            if (ctrl && Input.GetKeyDown(KeyCode.RightArrow) && hasBuffers)
+            if (ctrl && ModInput.GetKeyDown(KeyCode.RightArrow) && hasBuffers)
             {
                 MoveBuffer(1);
                 return;
             }
 
-            if (saveLoadOpen && Input.GetKeyDown(KeyCode.LeftArrow))
+            if (saveLoadOpen && ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (saveLoadOpen && Input.GetKeyDown(KeyCode.RightArrow))
+            if (saveLoadOpen && ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Home))
+            if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 Jump(false);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.End))
+            if (ModInput.GetKeyDown(KeyCode.End))
             {
                 Jump(true);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveHero(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.RightArrow))
+            if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveHero(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.UpArrow))
+            if (ModInput.GetKeyDown(KeyCode.UpArrow))
             {
                 Move(-1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.DownArrow))
+            if (ModInput.GetKeyDown(KeyCode.DownArrow))
             {
                 Move(1);
                 return;
             }
 
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 Activate();
             }
@@ -1421,12 +1421,12 @@ namespace AccessTheObelisk
         private void MoveHero(int delta)
         {
             CardCraftManager craft = CardCraftManager.Instance;
-            if (craft == null || HeroIndexField == null)
+            if (craft == null || AtOManager.Instance == null)
             {
                 return;
             }
 
-            int current = (int)HeroIndexField.GetValue(craft);
+            int current = AtOManager.Instance.team.GetHeroPosition(craft.CurrentHero);
             int next = FindNextHero(current, delta);
             if (next == current)
             {
@@ -1434,14 +1434,14 @@ namespace AccessTheObelisk
                 return;
             }
 
-            AtOManager.Instance.SideBarCharacterClicked(next);
+            AtOManager.Instance.SideBarCharacterClicked(AtOManager.Instance.team.GetHero(next));
             _index = 0;
             _lineIndex = 0;
             _bufferIndex = 0;
             _selectedUpgradeCardId = 0;
             Refresh(craft);
             string owner = Clean(craft.cardsOwner != null ? craft.cardsOwner.text : "");
-            Hero hero = AtOManager.Instance.GetHero(next);
+            Hero hero = AtOManager.Instance.team.GetHero(next);
             if (string.IsNullOrWhiteSpace(owner) && hero != null)
             {
                 owner = hero.SourceName;
@@ -1461,7 +1461,7 @@ namespace AccessTheObelisk
                     continue;
                 }
 
-                Hero hero = AtOManager.Instance.GetHero(index);
+                Hero hero = AtOManager.Instance.team.GetHero(index);
                 if (hero == null || hero.HeroData == null)
                 {
                     continue;
@@ -1936,7 +1936,11 @@ namespace AccessTheObelisk
                 }
             }
 
-            if (craft != null && craft.craftType == 1 && craft.buttonRemove != null && craft.buttonRemove.gameObject.activeInHierarchy)
+            if (craft != null &&
+                craft.craftType == 1 &&
+                item.CardData != null &&
+                craft.buttonRemove != null &&
+                craft.buttonRemove.gameObject.activeInHierarchy)
             {
                 BotonGeneric button = craft.buttonRemove.GetComponent<BotonGeneric>();
                 string buttonText = button != null ? Clean(button.GetText()) : "";
@@ -1995,7 +1999,7 @@ namespace AccessTheObelisk
                 return "";
             }
 
-            int dust = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerDust() : 0;
+            int dust = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerDust() : 0;
             if (cost == 0)
             {
                 return Loc.Get("craft_upgrade_cost_free");
@@ -2096,7 +2100,7 @@ namespace AccessTheObelisk
                 return "";
             }
 
-            int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+            int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
             if (cost == 0)
             {
                 return Loc.Get("craft_remove_cost_free");
@@ -2152,7 +2156,7 @@ namespace AccessTheObelisk
 
         private static string RemoveMinimumDeckText(CardCraftManager craft, CraftItem item)
         {
-            if (craft == null || craft.craftType != 1 || AtOManager.Instance == null || AtOManager.Instance.Sandbox_noMinimumDecksize)
+            if (craft == null || craft.craftType != 1 || AtOManager.Instance == null || SandboxManager.Instance.NoMinimumDecksize)
             {
                 return "";
             }
@@ -2192,7 +2196,7 @@ namespace AccessTheObelisk
             }
 
             int cost = GetRemoveCost(craft);
-            int gold = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerGold() : 0;
+            int gold = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerGold() : 0;
             if (cost > gold && cost < 1000000)
             {
                 return Loc.Get("craft_remove_not_enough_gold", cost, gold);
@@ -2219,7 +2223,7 @@ namespace AccessTheObelisk
 
         private static bool IsMinimumDeckBlockingRemove(CardCraftManager craft, CraftItem item)
         {
-            if (craft == null || item == null || item.CardData == null || AtOManager.Instance == null || AtOManager.Instance.Sandbox_noMinimumDecksize)
+            if (craft == null || item == null || item.CardData == null || AtOManager.Instance == null || SandboxManager.Instance.NoMinimumDecksize)
             {
                 return false;
             }
@@ -2245,13 +2249,7 @@ namespace AccessTheObelisk
 
         private static Hero CurrentCraftHero(CardCraftManager craft)
         {
-            if (craft == null || HeroIndexField == null || AtOManager.Instance == null)
-            {
-                return null;
-            }
-
-            int heroIndex = (int)HeroIndexField.GetValue(craft);
-            return AtOManager.Instance.GetHero(heroIndex);
+            return craft != null ? craft.CurrentHero : null;
         }
 
         private static string UpgradeUnavailableText(CardCraftManager craft, CardBuffer buffer)
@@ -2262,7 +2260,7 @@ namespace AccessTheObelisk
             }
 
             int cost = GetUpgradeCost(craft, buffer.UpgradeType);
-            int dust = AtOManager.Instance != null ? AtOManager.Instance.GetPlayerDust() : 0;
+            int dust = AtOManager.Instance != null ? AtOManager.Instance.CurrencyManager.GetPlayerDust() : 0;
             if (cost > dust && cost < 1000000)
             {
                 return Loc.Get("craft_upgrade_not_enough_dust", cost, dust);
@@ -2386,7 +2384,7 @@ namespace AccessTheObelisk
         }
     }
 
-    [HarmonyPatch(typeof(CardCraftManager), nameof(CardCraftManager.RemoveDeckAction))]
+    [HarmonyPatch(typeof(CardCraftManager), nameof(CardCraftManager.RemoveDeck))]
     internal static class CardCraftManagerRemoveDeckActionPatch
     {
         private static void Postfix()

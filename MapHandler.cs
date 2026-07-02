@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
+using Cards;
+using Cards.Data;
 namespace AccessTheObelisk
 {
     /// <summary>
@@ -110,22 +112,22 @@ namespace AccessTheObelisk
 
         private void ProcessKeys(MapManager map)
         {
-            bool ctrl = UnityEngine.Input.GetKey(KeyCode.LeftControl) || UnityEngine.Input.GetKey(KeyCode.RightControl);
+            bool ctrl = ModInput.GetKey(KeyCode.LeftControl) || ModInput.GetKey(KeyCode.RightControl);
             if (ctrl)
             {
-                if (UnityEngine.Input.GetKeyDown(KeyCode.UpArrow))
+                if (ModInput.GetKeyDown(KeyCode.UpArrow))
                 {
                     MovePreviewForward(map);
                 }
-                else if (UnityEngine.Input.GetKeyDown(KeyCode.DownArrow))
+                else if (ModInput.GetKeyDown(KeyCode.DownArrow))
                 {
                     MovePreviewBackward(map);
                 }
-                else if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
+                else if (ModInput.GetKeyDown(KeyCode.LeftArrow))
                 {
                     CyclePreviewBranch(map, -1);
                 }
-                else if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
+                else if (ModInput.GetKeyDown(KeyCode.RightArrow))
                 {
                     CyclePreviewBranch(map, 1);
                 }
@@ -133,24 +135,24 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.LeftArrow))
+            if (ModInput.GetKeyDown(KeyCode.LeftArrow))
             {
                 MoveFocus(map, -1);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.RightArrow))
+            else if (ModInput.GetKeyDown(KeyCode.RightArrow))
             {
                 MoveFocus(map, 1);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.Home))
+            else if (ModInput.GetKeyDown(KeyCode.Home))
             {
                 JumpFocus(map, false);
             }
-            else if (UnityEngine.Input.GetKeyDown(KeyCode.End))
+            else if (ModInput.GetKeyDown(KeyCode.End))
             {
                 JumpFocus(map, true);
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter))
+            if (ModInput.GetKeyDown(KeyCode.Return) || ModInput.GetKeyDown(KeyCode.KeypadEnter))
             {
                 ActivateCurrent(map);
             }
@@ -175,7 +177,7 @@ namespace AccessTheObelisk
                 nextIndex = _availableNodes.Count - 1;
             }
 
-            if (nextIndex == _focusedDestinationIndex && _availableNodes.Count > 1)
+            if (nextIndex == _focusedDestinationIndex && (_availableNodes.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -312,7 +314,7 @@ namespace AccessTheObelisk
                 nextIndex = choices.Count - 1;
             }
 
-            if (nextIndex == currentIndex && choices.Count > 1)
+            if (nextIndex == currentIndex && (choices.Count > 1 || !ModSettings.RepeatSingleItemEnabled))
             {
                 return;
             }
@@ -1291,7 +1293,7 @@ namespace AccessTheObelisk
             }
         }
 
-        private static void AddCardReward(HashSet<string> set, CardData card)
+        private static void AddCardReward(HashSet<string> set, CardRealtimeData card)
         {
             if (set == null || card == null)
             {
@@ -1462,7 +1464,7 @@ namespace AccessTheObelisk
             return string.IsNullOrWhiteSpace(text) ? data.NPCName : text;
         }
 
-        private static string CardName(CardData data)
+        private static string CardName(CardRealtimeData data)
         {
             if (data == null)
             {
