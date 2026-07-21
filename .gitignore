@@ -4,6 +4,7 @@ target/
 dist/
 decompiled/
 decompiled-new/
+decompiled-newer/
 save-backups/
 *.user
 *.suo

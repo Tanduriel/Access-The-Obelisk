@@ -1,5 +1,6 @@
 using HarmonyLib;
 using TMPro;
+using UnityEngine;
 
 namespace AccessTheObelisk
 {
@@ -10,8 +11,23 @@ namespace AccessTheObelisk
     /// </summary>
     public sealed class VirtualKeyboardHandler
     {
+        /// <summary>
+        /// Grace period after <see cref="KeyboardManager.Instance"/> first appears
+        /// during which state changes are tracked silently, never announced. The
+        /// overlay's GameObject starts active in the scene and its own
+        /// <c>Start()</c> hides it shortly after, but not always within the same
+        /// frame our polling sees it, so <see cref="_announcedOpen"/> alone isn't
+        /// enough to suppress the very first "opened": this window keeps
+        /// <see cref="_wasActive"/> from ever taking the "just opened" branch
+        /// (the only place that sets <see cref="_announcedOpen"/>) for that
+        /// startup blip, however long it happens to last.
+        /// </summary>
+        private const float StartupGraceSeconds = 1f;
+
         private bool _wasActive;
+        private bool _announcedOpen;
         private int _lastFocusIndex = -1;
+        private float _readyAt = -1f;
 
         /// <summary>
         /// Announces the overlay opening/closing and focus changes between its
@@ -21,10 +37,33 @@ namespace AccessTheObelisk
         public bool Update()
         {
             KeyboardManager keyboard = KeyboardManager.Instance;
-            bool active = keyboard != null && keyboard.elements != null && keyboard.IsActive();
+            if (keyboard == null)
+            {
+                Reset();
+                _readyAt = -1f;
+                return false;
+            }
+
+            if (_readyAt < 0f)
+            {
+                _readyAt = Time.unscaledTime + StartupGraceSeconds;
+            }
+
+            bool active = keyboard.elements != null && keyboard.IsActive();
+            if (Time.unscaledTime < _readyAt)
+            {
+                _wasActive = active;
+                return active;
+            }
+
             if (!active)
             {
-                if (_wasActive)
+                // Only announce closing if we actually announced opening. This
+                // covers the case where the startup blip outlasts the grace
+                // window above: _wasActive got silently latched to true during
+                // the window, so the "just opened" branch below never runs and
+                // _announcedOpen is never set, once the overlay is really hidden.
+                if (_announcedOpen)
                 {
                     ScreenReader.Say(Loc.Get("virtual_keyboard_closed"));
                 }
@@ -36,6 +75,7 @@ namespace AccessTheObelisk
             if (!_wasActive)
             {
                 _wasActive = true;
+                _announcedOpen = true;
                 ScreenReader.Say(Loc.Get("virtual_keyboard_opened"));
                 AnnounceFocus(keyboard, true);
                 return true;
@@ -48,6 +88,7 @@ namespace AccessTheObelisk
         private void Reset()
         {
             _wasActive = false;
+            _announcedOpen = false;
             _lastFocusIndex = -1;
         }
 
@@ -103,7 +144,7 @@ namespace AccessTheObelisk
     /// Announces each on-screen keyboard key press as it is typed, mirroring how
     /// a screen reader echoes typed characters on a physical keyboard.
     /// </summary>
-    [HarmonyPatch(typeof(KeyboardManager), nameof(KeyboardManager.DoKey))]
+    [HarmonyPatch(typeof(KeyboardManager), "DoKey")]
     internal static class VirtualKeyboardKeyPressPatch
     {
         private static void Postfix(string name, string value)

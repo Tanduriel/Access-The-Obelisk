@@ -3,7 +3,7 @@
 # Placeholders such as {0} must stay in the translated string.
 # Russian is intentionally allowed to be partial: missing keys fall back to en.txt.
 
-mod_loaded=Access The Obelisk v 0.5
+mod_loaded=Access The Obelisk v 0.5.1
 patches_failed=Предупреждение мода доступности: часть игровых перехватов не загрузилась.
 update_available=Доступна новая версия AccessTheObelisk: {0}. Установлена версия: {1}.
 update_current=Установлена последняя версия AccessTheObelisk: {0}.

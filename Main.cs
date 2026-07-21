@@ -20,7 +20,7 @@ namespace AccessTheObelisk
         /// <summary>
         /// Current mod version used by BepInEx and the update checker.
         /// </summary>
-        public const string PluginVersion = "0.5";
+        public const string PluginVersion = "0.5.1";
 
         private float _startupTimer;
         private float _lastMemoryLogTime;

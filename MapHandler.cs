@@ -13,6 +13,7 @@ namespace AccessTheObelisk
     public sealed class MapHandler
     {
         private static readonly FieldInfo RoadsField = AccessTools.Field(typeof(MapManager), "roads");
+        private static readonly MethodInfo IsMaskActiveMethod = AccessTools.Method(typeof(MapManager), "IsMaskActive");
         private readonly List<Node> _availableNodes = new List<Node>();
         private readonly List<Node> _mapExplorerPath = new List<Node>();
         private readonly List<Node> _mapExplorerChildren = new List<Node>();
@@ -49,7 +50,7 @@ namespace AccessTheObelisk
                 return;
             }
 
-            if (EventManager.Instance != null || map.IsMaskActive() || map.selectedNode)
+            if (EventManager.Instance != null || IsMaskActive(map) || map.selectedNode)
             {
                 return;
             }
@@ -683,6 +684,12 @@ namespace AccessTheObelisk
             SortNodesByRouteOrder(result);
             KeepNearestRouteDepth(map, source, result);
             return result;
+        }
+
+        private static bool IsMaskActive(MapManager map)
+        {
+            return map != null && IsMaskActiveMethod != null
+                && (bool)IsMaskActiveMethod.Invoke(map, null);
         }
 
         private static bool HasRoadBetween(MapManager map, Node source, Node destination)

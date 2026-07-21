@@ -1,4 +1,4 @@
-Access the Obelisk V 0.5.
+Access the Obelisk V 0.5.1.
 
 Warning! This is a test version of the mod. Not all game features are implemented yet, and bugs, unfinished behavior, inconveniences, and other issues are possible. The mod is in active development and will be updated.
 

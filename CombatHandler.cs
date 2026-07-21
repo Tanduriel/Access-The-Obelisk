@@ -207,6 +207,7 @@ namespace AccessTheObelisk
         private static readonly FieldInfo EnergySelectorMaxAssignedField = AccessTools.Field(typeof(UIEnergySelector), "maxEnergyToBeAssigned");
         private static readonly FieldInfo DiscardSelectorNonLimitedField = AccessTools.Field(typeof(UIDiscardSelector), "nonLimitedNumCards");
         private static readonly FieldInfo ItemCombatIconCardDataField = AccessTools.Field(typeof(ItemCombatIcon), "cardData");
+        private static readonly FieldInfo NpcActiveField = AccessTools.Field(typeof(MatchManager), "npcActive");
 
         private sealed class TurnOrderItem
         {
@@ -1632,6 +1633,8 @@ namespace AccessTheObelisk
                 {
                     AddLine(lines, cardItem.Lines[lineIndex]);
                 }
+
+                AddLine(lines, BuildRevealedCardPreview(npc, card.CardData));
             }
 
             return lines;
@@ -1914,8 +1917,8 @@ namespace AccessTheObelisk
             match.SetCardActive(card.CardData);
             match.SetDamagePreview(theCasterIsHero: true, card.CardData, card.tablePosition);
             List<string> previews = new List<string>();
-            AddImmediateCardPreviewForCharacters(previews, TeamHeroes(match), card.CardData);
-            AddImmediateCardPreviewForCharacters(previews, TeamNpcs(match), card.CardData);
+            AddImmediateCardPreviewForCharacters(previews, TeamHeroes(match), card.CardData, casterIsHero: true);
+            AddImmediateCardPreviewForCharacters(previews, TeamNpcs(match), card.CardData, casterIsHero: true);
             if (previews.Count == 0)
             {
                 return string.Empty;
@@ -1924,7 +1927,56 @@ namespace AccessTheObelisk
             return Loc.Get("combat_immediate_card_preview", string.Join(" ", previews.ToArray()));
         }
 
-        private static void AddImmediateCardPreviewForCharacters(List<string> previews, Character[] characters, CardRealtimeData cardData)
+        /// <summary>
+        /// Builds a damage/effect forecast for a revealed NPC card against every
+        /// currently valid target, mirroring <see cref="BuildImmediateCardPreview"/>
+        /// but with the previewing NPC (not the local hero) as the caster.
+        /// </summary>
+        private static string BuildRevealedCardPreview(NPC npc, CardRealtimeData data)
+        {
+            MatchManager match = MatchManager.Instance;
+            if (match == null || npc == null || data == null || NpcActiveField == null)
+            {
+                return string.Empty;
+            }
+
+            NPC[] npcs = TeamNpcs(match);
+            int npcIndex = Array.IndexOf(npcs, npc);
+            if (npcIndex < 0)
+            {
+                return string.Empty;
+            }
+
+            CardRealtimeData previousCardActive = match.CardActive;
+            object previousNpcActive = NpcActiveField.GetValue(match);
+            try
+            {
+                NpcActiveField.SetValue(match, npcIndex);
+                match.SetCardActive(data);
+                match.SetDamagePreview(theCasterIsHero: false, data);
+                List<string> previews = new List<string>();
+                AddImmediateCardPreviewForCharacters(previews, TeamHeroes(match), data, casterIsHero: false);
+                AddImmediateCardPreviewForCharacters(previews, TeamNpcs(match), data, casterIsHero: false);
+                if (previews.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                return Loc.Get("combat_immediate_card_preview", string.Join(" ", previews.ToArray()));
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogState("CombatHandler failed to build revealed card preview: " + ex.Message);
+                return string.Empty;
+            }
+            finally
+            {
+                NpcActiveField.SetValue(match, previousNpcActive);
+                match.SetCardActive(previousCardActive);
+            }
+        }
+
+        private static void AddImmediateCardPreviewForCharacters(List<string> previews, Character[] characters, CardRealtimeData cardData, bool casterIsHero)
         {
             if (characters == null)
             {
@@ -1940,7 +1992,7 @@ namespace AccessTheObelisk
                 }
 
                 Transform target = GetCharacterTargetTransform(character);
-                if (target == null || MatchManager.Instance == null || !MatchManager.Instance.CheckTarget(target, cardData))
+                if (target == null || MatchManager.Instance == null || !MatchManager.Instance.CheckTarget(target, cardData, casterIsHero))
                 {
                     continue;
                 }

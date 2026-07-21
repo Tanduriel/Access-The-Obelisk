@@ -1,6 +1,12 @@
 Unreleased
 
 
+V 0.5.1
+
+The mod is now compatible with game version 1.7.6.1.
+On ctrl+i, revealed enemy cards now announce full information, including a damage and effect forecast for their targets.
+
+
 V 0.5
 
 The mod is now compatible with game version 1.7.6. Older game versions are no longer supported due to significant changes in the game's code.

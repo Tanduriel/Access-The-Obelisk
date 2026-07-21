@@ -2,7 +2,7 @@
 # Format: key=value
 # Placeholders such as {0} must stay in the translated string.
 
-mod_loaded=Access The Obelisk v 0.5
+mod_loaded=Access The Obelisk v 0.5.1
 patches_failed=Accessibility mod warning: some game hooks failed to load.
 update_available=A new AccessTheObelisk version is available: {0}. Installed version: {1}.
 update_current=The latest AccessTheObelisk version is installed: {0}.

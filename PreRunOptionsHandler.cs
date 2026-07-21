@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -10,6 +11,15 @@ namespace AccessTheObelisk
     /// </summary>
     public sealed class PreRunOptionsHandler
     {
+        private static readonly MethodInfo IsMadnessCorruptorSelectedMethod =
+            AccessTools.Method(typeof(MadnessManager), "IsMadnessCorruptorSelected");
+
+        private static bool IsMadnessCorruptorSelected(MadnessManager manager, int index)
+        {
+            return manager != null && IsMadnessCorruptorSelectedMethod != null
+                && (bool)IsMadnessCorruptorSelectedMethod.Invoke(manager, new object[] { index });
+        }
+
         private enum ItemKind
         {
             MadnessLevel,
@@ -549,7 +559,7 @@ namespace AccessTheObelisk
                         ? Loc.Get("pre_run_madness_value", item.IntValue)
                         : Loc.Get("pre_run_madness_value_details", item.IntValue, item.Details);
                 case ItemKind.MadnessCorruptor:
-                    return Loc.Get("pre_run_toggle_value", item.Label, MadnessManager.Instance.IsMadnessCorruptorSelected(item.IntValue) ? Loc.Get("settings_on") : Loc.Get("settings_off"), item.Details);
+                    return Loc.Get("pre_run_toggle_value", item.Label, IsMadnessCorruptorSelected(MadnessManager.Instance, item.IntValue) ? Loc.Get("settings_on") : Loc.Get("settings_off"), item.Details);
                 case ItemKind.SandboxCombo:
                     return Loc.Get("pre_run_sandbox_value", item.Label, SandboxComboValue(item.Key));
                 case ItemKind.SandboxChoice:

@@ -31,6 +31,18 @@ The game received a major update (new `Assembly-CSharp.dll` dated 2026-06-17). T
 - Detailed old→new API mappings are recorded in the assistant memory file `game-update-migration.md`.
 - NOT yet verified in-game — needs a launch to confirm the mod loads (no TypeLoadException) and that features still speak correctly.
 
+## Game update fix (2026-07-21)
+
+The game auto-updated again (Steam buildid 24123647, new `Assembly-CSharp.dll` dated 2026-07-13, ~2.98MB). Unlike the previous update, this was a small, targeted accessibility change on the game's side: three previously-`public` helper members became `private`. Because the compiler validates every `nameof(...)`-based Harmony patch target, this reduced to exactly 3 build errors (no silent breakage — a full sweep of every `AccessTools.Field/Method` string-based reflection lookup in the codebase confirmed all other reflected members are unchanged):
+
+- `MapManager.IsMaskActive()` public → private. This is what broke the map for the user — `MapHandler.Update()` calls it every frame to decide whether to announce/navigate the map, so it silently threw and blocked all map announcements, destination-arrow navigation, and route preview (Ctrl+Arrows). Fixed via `AccessTools.Method` reflection in [MapHandler.cs](MapHandler.cs), same pattern as the existing `roads` field lookup.
+- `KeyboardManager.DoKey(string, string)` public → private. Fixed by changing the Harmony patch attribute in [VirtualKeyboardHandler.cs](VirtualKeyboardHandler.cs) from `nameof(KeyboardManager.DoKey)` to the string literal `"DoKey"` (nameof can't resolve a private member from another class).
+- `MadnessManager.IsMadnessCorruptorSelected(int)` public → private. Fixed via `AccessTools.Method` reflection in [PreRunOptionsHandler.cs](PreRunOptionsHandler.cs) (the public `IsMadnessTraitActive` wrapper was not a safe substitute — it adds an `IsZoneAffectedByMadness()` gate that changes behavior on the pre-run screen).
+
+Also added `decompiled-newer\**` to the `.csproj` compile-exclude list (a fresh full decompile for this game version) and to `.gitignore`, matching `decompiled\` and `decompiled-new\`.
+
+Build is green (0 errors/warnings) and deployed. Harmony patches apply cleanly at startup (verified via a fresh launch + `BepInEx/LogOutput.log`). Map/route/preview behavior itself still needs the user's own in-game (NVDA) confirmation, since exercising navigation isn't something this session's automated checks can drive.
+
 ## Known Issues
 
 - Unity 2022.3.62f2 has a known MelonLoader crash warning in the template known-issues list.
